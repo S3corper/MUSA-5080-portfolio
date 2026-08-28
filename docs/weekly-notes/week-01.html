@@ -227,7 +227,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>Antomy of .qmd YAML (title, date) Markdown (.md) Code chucks (’’‘, {}, library(tidycensis), 2+2,’’’)</p>
 <p><strong>Files+Folders</strong></p>
 <p>Who is the file for? <strong>For me (a page I worte)</strong> index.qmd about.qmd weekly_notes/*.qmd assignments/.qmd</p>
-<p><strong>For the Machines</strong> -quarto.yml (settings for whole website)</p>
+<p><strong>For the Machines</strong> -quarto.yml (settings for whole website) -_freeze/ -&gt; quarto Rproj -&gt;Rstudio .gitignore -&gt; Github Renviron -&gt; R (secrets)</p>
 <p>The loop: <strong>Edit → Save → Render → Commit → Push → wait → refresh</strong></p>
 </section>
 <section id="proving-r-works" class="level2">
@@ -763,30 +763,34 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-52"><a href="#cb3-52" aria-hidden="true" tabindex="-1"></a>**For the Machines**</span>
 <span id="cb3-53"><a href="#cb3-53" aria-hidden="true" tabindex="-1"></a>-quarto.yml (settings for whole website)</span>
-<span id="cb3-54"><a href="#cb3-54" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-55"><a href="#cb3-55" aria-hidden="true" tabindex="-1"></a>The loop: **Edit → Save → Render → Commit → Push → wait → refresh**</span>
-<span id="cb3-56"><a href="#cb3-56" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-57"><a href="#cb3-57" aria-hidden="true" tabindex="-1"></a><span class="fu">## Proving R Works</span></span>
+<span id="cb3-54"><a href="#cb3-54" aria-hidden="true" tabindex="-1"></a>-_freeze/ -&gt; quarto</span>
+<span id="cb3-55"><a href="#cb3-55" aria-hidden="true" tabindex="-1"></a>Rproj -&gt;Rstudio</span>
+<span id="cb3-56"><a href="#cb3-56" aria-hidden="true" tabindex="-1"></a>.gitignore -&gt; Github</span>
+<span id="cb3-57"><a href="#cb3-57" aria-hidden="true" tabindex="-1"></a>Renviron -&gt; R (secrets)</span>
 <span id="cb3-58"><a href="#cb3-58" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-59"><a href="#cb3-59" aria-hidden="true" tabindex="-1"></a>The chunk below runs when this page renders. If you can see a result underneath</span>
-<span id="cb3-60"><a href="#cb3-60" aria-hidden="true" tabindex="-1"></a>it on your published site, R and Quarto are talking to each other correctly.</span>
-<span id="cb3-61"><a href="#cb3-61" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-64"><a href="#cb3-64" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
-<span id="cb3-65"><a href="#cb3-65" aria-hidden="true" tabindex="-1"></a><span class="fu">sessionInfo</span>()<span class="sc">$</span>R.version<span class="sc">$</span>version.string</span>
-<span id="cb3-66"><a href="#cb3-66" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb3-67"><a href="#cb3-67" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-68"><a href="#cb3-68" aria-hidden="true" tabindex="-1"></a><span class="fu">## Reflection</span></span>
-<span id="cb3-69"><a href="#cb3-69" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-70"><a href="#cb3-70" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- CHANGE THIS: 3-4 sentences --&gt;</span></span>
+<span id="cb3-59"><a href="#cb3-59" aria-hidden="true" tabindex="-1"></a>The loop: **Edit → Save → Render → Commit → Push → wait → refresh**</span>
+<span id="cb3-60"><a href="#cb3-60" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-61"><a href="#cb3-61" aria-hidden="true" tabindex="-1"></a><span class="fu">## Proving R Works</span></span>
+<span id="cb3-62"><a href="#cb3-62" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-63"><a href="#cb3-63" aria-hidden="true" tabindex="-1"></a>The chunk below runs when this page renders. If you can see a result underneath</span>
+<span id="cb3-64"><a href="#cb3-64" aria-hidden="true" tabindex="-1"></a>it on your published site, R and Quarto are talking to each other correctly.</span>
+<span id="cb3-65"><a href="#cb3-65" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-68"><a href="#cb3-68" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
+<span id="cb3-69"><a href="#cb3-69" aria-hidden="true" tabindex="-1"></a><span class="fu">sessionInfo</span>()<span class="sc">$</span>R.version<span class="sc">$</span>version.string</span>
+<span id="cb3-70"><a href="#cb3-70" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb3-71"><a href="#cb3-71" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-72"><a href="#cb3-72" aria-hidden="true" tabindex="-1"></a>What I want out of this course: Learn more about public policy analysis. </span>
+<span id="cb3-72"><a href="#cb3-72" aria-hidden="true" tabindex="-1"></a><span class="fu">## Reflection</span></span>
 <span id="cb3-73"><a href="#cb3-73" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-74"><a href="#cb3-74" aria-hidden="true" tabindex="-1"></a>One thing I'm nervous about: So much set up more even starting the class, but still looking forward to learn more about github and r and everything else.</span>
+<span id="cb3-74"><a href="#cb3-74" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- CHANGE THIS: 3-4 sentences --&gt;</span></span>
 <span id="cb3-75"><a href="#cb3-75" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-76"><a href="#cb3-76" aria-hidden="true" tabindex="-1"></a><span class="fu">## Questions I Still Have</span></span>
+<span id="cb3-76"><a href="#cb3-76" aria-hidden="true" tabindex="-1"></a>What I want out of this course: Learn more about public policy analysis. </span>
 <span id="cb3-77"><a href="#cb3-77" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-78"><a href="#cb3-78" aria-hidden="true" tabindex="-1"></a>-</span>
-<span id="cb3-79"><a href="#cb3-79" aria-hidden="true" tabindex="-1"></a>-</span>
+<span id="cb3-78"><a href="#cb3-78" aria-hidden="true" tabindex="-1"></a>One thing I'm nervous about: So much set up more even starting the class, but still looking forward to learn more about github and r and everything else.</span>
+<span id="cb3-79"><a href="#cb3-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-80"><a href="#cb3-80" aria-hidden="true" tabindex="-1"></a><span class="fu">## Questions I Still Have</span></span>
+<span id="cb3-81"><a href="#cb3-81" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-82"><a href="#cb3-82" aria-hidden="true" tabindex="-1"></a>-</span>
+<span id="cb3-83"><a href="#cb3-83" aria-hidden="true" tabindex="-1"></a>-</span>
 </code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->

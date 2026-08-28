@@ -51,6 +51,10 @@ assignments/.qmd
 
 **For the Machines**
 -quarto.yml (settings for whole website)
+-_freeze/ -> quarto
+Rproj ->Rstudio
+.gitignore -> Github
+Renviron -> R (secrets)
 
 The loop: **Edit → Save → Render → Commit → Push → wait → refresh**
 
