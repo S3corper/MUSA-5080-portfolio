@@ -98,6 +98,12 @@ Commit -> "save a labeled snapshot" (live on your computer)
 
 Push -> "send my snapshot to Github"
 
+**R script**
+
+Code Only
+
+Sandbox
+
 - The loop: **Edit → Save → Render → Commit → Push → wait → refresh**
 
 ## Proving R Works
