@@ -4,7 +4,7 @@
     "href": "index.html",
     "title": "Home",
     "section": "",
-    "text": "Welcome to my portfolio for MUSA 5080: Public Policy Analytics at the University of Pennsylvania.\nThis site documents my work in the Master of Urban Spatial Analytics program — weekly notes, course assignments, and a final project applying data analysis to urban policy questions.\n\n\n\nI’m a student in the MUSA program at Penn. My background is in hands-on GIS fieldwork, site analysis, and 3D imagery processing, and I’m interested in smart cities and walkability.\n\n\n\n\nWeekly Notes — what I’m learning each week\nAssignments — analyses completed for the course\nAbout — more background and how to reach me\n\n\n\n\n\n\nEmail: leoleung@upenn.edu\nGitHub: @S3corper"
+    "text": "Welcome to my portfolio for MUSA 5080: Public Policy Analytics at the University of Pennsylvania.😄\nThis site documents my work in the Master of Urban Spatial Analytics program — weekly notes, course assignments, and a final project applying data analysis to urban policy questions.\n\n\n\nI’m a student in the MUSA program at Penn. My background is in hands-on GIS fieldwork, site analysis, and 3D imagery processing, and I’m interested in smart cities and walkability.\n\n\n\n\nWeekly Notes — what I’m learning each week\nAssignments — analyses completed for the course\nAbout — more background and how to reach me\n\n\n\n\n\n\nEmail: leoleung@upenn.edu\nGitHub: @S3corper"
   },
   {
     "objectID": "index.html#about-me",
@@ -74,28 +74,28 @@
     "href": "about.html",
     "title": "About",
     "section": "",
-    "text": "Write a few paragraphs about yourself here: where you came from before MUSA, what drew you to urban spatial analytics, and what you’re hoping to do with it."
+    "text": "I was born and raised in Hong Kong and moved to the U.S. as a first-generation college student to pursue higher education. I studied Urban Studies and GIS at UC San Diego, where I fell in love with using spatial data to address real-world challenges like walkability, pedestrian safety, and wildfire risk. What drew me to urban spatial analytics is its power to combine data science, mapping, and programming to make cities more equitable, safe, and resilient. Through MUSA, I’m excited to dive into predictive modeling and urban informatics to advance sustainable transportation and hazard mitigation. My goal is to work as a GIS analyst using data to build better urban systems!"
   },
   {
     "objectID": "about.html#background",
     "href": "about.html#background",
     "title": "About",
     "section": "",
-    "text": "Write a few paragraphs about yourself here: where you came from before MUSA, what drew you to urban spatial analytics, and what you’re hoping to do with it."
+    "text": "I was born and raised in Hong Kong and moved to the U.S. as a first-generation college student to pursue higher education. I studied Urban Studies and GIS at UC San Diego, where I fell in love with using spatial data to address real-world challenges like walkability, pedestrian safety, and wildfire risk. What drew me to urban spatial analytics is its power to combine data science, mapping, and programming to make cities more equitable, safe, and resilient. Through MUSA, I’m excited to dive into predictive modeling and urban informatics to advance sustainable transportation and hazard mitigation. My goal is to work as a GIS analyst using data to build better urban systems!"
   },
   {
     "objectID": "about.html#skills",
     "href": "about.html#skills",
     "title": "About",
     "section": "Skills",
-    "text": "Skills\n\n\nLanguages & Tools: R, Quarto, Git\nSpatial: (add as you learn)\nData: US Census / ACS via tidycensus"
+    "text": "Skills\n\n\nLanguages & Tools: R, Quarto, Git, Python\nSpatial: (add as you learn)\nData: US Census / ACS via tidycensus"
   },
   {
     "objectID": "about.html#contact",
     "href": "about.html#contact",
     "title": "About",
     "section": "Contact",
-    "text": "Contact\n\n\nEmail: your-email@upenn.edu\nGitHub: @your-username"
+    "text": "Contact\n\n\nEmail: leoleung@upenn.edu\nGitHub: @S3corper"
   },
   {
     "objectID": "assignments/index.html",

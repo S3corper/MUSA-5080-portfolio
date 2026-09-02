@@ -6,14 +6,13 @@ title: "About"
 
 <!-- CHANGE THIS -->
 
-Write a few paragraphs about yourself here: where you came from before MUSA,
-what drew you to urban spatial analytics, and what you're hoping to do with it.
+I was born and raised in Hong Kong and moved to the U.S. as a first-generation college student to pursue higher education. I studied Urban Studies and GIS at UC San Diego, where I fell in love with using spatial data to address real-world challenges like walkability, pedestrian safety, and wildfire risk. What drew me to urban spatial analytics is its power to combine data science, mapping, and programming to make cities more equitable, safe, and resilient. Through MUSA, I’m excited to dive into predictive modeling and urban informatics to advance sustainable transportation and hazard mitigation. My goal is to work as a GIS analyst using data to build better urban systems!
 
 ## Skills
 
 <!-- CHANGE THIS: update this through the semester as it becomes true -->
 
-- **Languages & Tools:** R, Quarto, Git
+- **Languages & Tools:** R, Quarto, Git, Python
 - **Spatial:** (add as you learn)
 - **Data:** US Census / ACS via `tidycensus`
 
@@ -21,5 +20,5 @@ what drew you to urban spatial analytics, and what you're hoping to do with it.
 
 <!-- CHANGE THIS -->
 
-- Email: your-email@upenn.edu
-- GitHub: [@your-username](https://github.com/your-username)
+- Email: leoleung@upenn.edu
+- GitHub: [@S3corper](https://github.com/S3corper)
