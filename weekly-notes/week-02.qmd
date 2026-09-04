@@ -12,7 +12,36 @@ First, we had a quiz. Then
 
 ## Key Concepts
 
+*Object, verbs, census*
+Console - Code disappears
 
+.R script
+
+Code chunk lives inside .qmd
+
+result <- filter(counties, population > 50000) #keep the big ones
+
+result = object that holds the result 
+
+<-: Assignment Arrow (or =)
+
+filter: Function Name (verb)
+
+Counties: Input data
+
+population > 50000: Arguments
+
+*Packages*
+
+Install.packages("dplyr") -> do once 
+
+library(dplyr) -> took the book off the shelf, everytime you want to use it
+
+library(tidycensus) 
+
+
+
+# Keep the big ones!: Comment (code description)
 
 The loop: **Edit → Save → Render → Commit → Push → wait → refresh**
 
