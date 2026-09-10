@@ -160,7 +160,8 @@ county_wide %>%
 **[What is the average population of high-confidence counties versus low-confidence
 counties? Is there a pattern?]**
 
-The avaerage population of high-confidence counties is 337126 in 65 counties, while the average population of low-confidence is 7842 in 2 counties. It means that larger population sizes have higher data confidence. 
+The average population of high-confidence counties is 337126 in 65 counties, while the average population of low-confidence is 7842 in 2 counties. It means that larger population sizes have higher data confidence. 
+
 ---
 
 ## What this means for policy
@@ -173,6 +174,7 @@ The avaerage population of high-confidence counties is 337126 in 65 counties, wh
 2. This uncertainty stems directly from how the American Community Survey (ACS) operates. Because the ACS collects data from a sample of households rather than conducting a full census count, smaller populations naturally yield smaller sample sizes. With fewer completed responses, individual sample variations will lead to higher random variations on a bigger impact, driving up the margin of error percentage relative to the estimate.
 
 3. If a state agency allocated funding based on median ages, like distributing senior services grants.  Treating every county's estimate as equally certain means that the rural residents would suffer most. In small counties, less sample calculated median age. If Lafayette County's median age were underestimated due to sampling error and there is more outliner, state algorithms might misclassify it as a younger community and withhold essential funding for senior centers, elder healthcare, and specialized transit. Meanwhile, large urban counties like Miami-Dade have massive sample sizes, negligible relative error, and stable funding streams. Relying uncritically on ACS estimates without accounting for margin of error disproportionately harms vulnerable, small-town communities by compounding statistical uncertainty with financial deprivation.
+
 ---
 
 ## Optional challenges - For those craving more
