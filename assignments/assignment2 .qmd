@@ -67,7 +67,9 @@ head(county_data)
 
 
 **[How many rows did you get? Does that match the number of counties in your state?]**
+
 There are 67 counties in Florida and my row count matches.
+
 ---
 
 ## How big is the margin of error?
@@ -94,7 +96,9 @@ county_data %>%
 
 **[Which county has the largest margin of error relative to its estimate? How large
 is it?]**
+
 Lafayette County, Florida has the largest margin of error relative to its estimate, which is around 6.22%.
+
 ---
 
 ## Sorting counties into reliability categories
@@ -112,7 +116,9 @@ count(county_data, reliability)
 
 
 **[How many counties fall into each category?]**
-If the cutoff is 5% and 10%, then 65 of them will land to high confidence and only 2 county will land to moderate. That is why I manually change the cutoffs to 2% and 5%, which showcase 59 in high confidence, 6 in moderate and 2 in low confidence. 
+
+If the cutoff is 5% and 10%, then 65 of them will land to high confidence and only 2 county will land to moderate. That is why I manually change the cutoffs to 2% and 5%, which showcase 59 in high confidence, 6 in moderate and 2 in low confidence.
+
 ---
 
 ## Is the margin of error bigger in small places?
