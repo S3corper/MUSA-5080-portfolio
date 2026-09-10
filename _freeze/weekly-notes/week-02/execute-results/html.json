@@ -1,9 +1,11 @@
 {
-  "hash": "2c40a549a3705d98848bf75a92e47425",
+  "hash": "bf0e90c5f49ef5019b6cdcc75f9cd728",
   "result": {
     "engine": "knitr",
-    "markdown": "---\ntitle: \"Week 2: dplyr and Census\"\ndescription: \"Table functions and acs data.\"\ndate: 2026-09-04\n---\n\n## What We Did\n\n<!-- CHANGE THIS: replace with your own notes -->\n\nFirst, we had a quiz. Then\n\n## Key Concepts\n\n\n\nThe loop: **Edit → Save → Render → Commit → Push → wait → refresh**\n\n## Proving R Works\n\nThe chunk below runs when this page renders. If you can see a result underneath\nit on your published site, R and Quarto are talking to each other correctly.\n\n\n::: {.cell}\n\n```{.r .cell-code}\nsessionInfo()$R.version$version.string\n```\n\n::: {.cell-output .cell-output-stdout}\n\n```\n[1] \"R version 4.6.1 (2026-06-24)\"\n```\n\n\n:::\n:::\n\n\n## Reflection\n\n<!-- CHANGE THIS: 3-4 sentences -->\n\n\n## Questions I Still Have\n\n-\n-\n",
-    "supporting": [],
+    "markdown": "---\ntitle: \"Week 2: dplyr and Census\"\ndescription: \"Table functions and acs data.\"\ndate: 2026-09-04\n---\n\n## What We Did\n\n<!-- CHANGE THIS: replace with your own notes -->\n\nFirst, we had a quiz. Then\n\n## Key Concepts\n\n*Object, verbs, census*\nConsole - Code disappears\n\n.R script\n\nCode chunk lives inside .qmd\n\nresult <- filter(counties, population > 50000) #keep the big ones\n\nresult = object that holds the result \n\n<-: Assignment Arrow (or =)\n\nfilter: Function Name (verb)\n\nCounties: Input data\n\npopulation > 50000: Arguments\n\n*Packages*\n\nInstall.packages(\"dplyr\") -> do once \n\nlibrary(dplyr) -> took the book off the shelf, everytime you want to use it\n\nlibrary(tidycensus) \n\n\n\n# Keep the big ones!: Comment (code description)\n\nThe loop: **Edit → Save → Render → Commit → Push → wait → refresh**\n\n## Proving R Works\n\nThe chunk below runs when this page renders. If you can see a result underneath\nit on your published site, R and Quarto are talking to each other correctly.\n\n\n::: {.cell}\n\n```{.r .cell-code}\nsessionInfo()$R.version$version.string\n```\n\n::: {.cell-output .cell-output-stdout}\n\n```\n[1] \"R version 4.6.1 (2026-06-24)\"\n```\n\n\n:::\n:::\n\n\n## Reflection\n\n<!-- CHANGE THIS: 3-4 sentences -->\n\n\n## Questions I Still Have\n\n-\n-\n",
+    "supporting": [
+      "week-02_files"
+    ],
     "filters": [
       "rmarkdown/pagebreak.lua"
     ],
