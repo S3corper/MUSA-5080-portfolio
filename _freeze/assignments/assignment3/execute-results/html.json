@@ -1,0 +1,15 @@
+{
+  "hash": "30cc685d234c26bd70d8d479a8c95958",
+  "result": {
+    "engine": "knitr",
+    "markdown": "---\ntitle: \"Assignment 3: Verify the Claim\"\nsubtitle: \"Testing a published claim about neighborhood change against the data behind it\"\nauthor: \"Leo Leung\"\ndate: today\nformat:\n  html:\n    toc: true\n    code-fold: false\nexecute:\n  warning: false\n  message: false\n---\n\n\n## Setup\n\n\n::: {.cell}\n\n```{.r .cell-code}\nlibrary(tidyverse)\nlibrary(tidycensus)\n```\n:::\n\n\n\n---\n\n## Part 1 — Reconstruct (roughly 1–2 paragraphs plus code)\nPull the ACS data the article appears to rely on. Document:\n\nWhich variable(s) you used and why. Include the variable code.\nWhich years and survey (acs5 vs acs1) you used and why.\nWhat you had to assume, because the article does not say.\nState clearly whether the two periods the article compares overlap. If they do, say what that means for any conclusion drawn from the comparison.\n\n---\n\n## Choosing what to measure\n\n```\nmy_state <- \"FL\"        # two-letter abbreviation, in quotes\nmy_variable <- \"B01002_001\"     # the variable code, in quotes\n```\n",
+    "supporting": [],
+    "filters": [
+      "rmarkdown/pagebreak.lua"
+    ],
+    "includes": {},
+    "engineDependencies": {},
+    "preserve": {},
+    "postProcess": true
+  }
+}

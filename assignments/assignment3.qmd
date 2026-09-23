@@ -1,0 +1,41 @@
+---
+title: "Assignment 3: Verify the Claim"
+subtitle: "Testing a published claim about neighborhood change against the data behind it"
+author: "Leo Leung"
+date: today
+format:
+  html:
+    toc: true
+    code-fold: false
+execute:
+  warning: false
+  message: false
+---
+
+
+## Setup
+
+```{r}
+library(tidyverse)
+library(tidycensus)
+```
+
+
+---
+
+## Part 1 — Reconstruct (roughly 1–2 paragraphs plus code)
+Pull the ACS data the article appears to rely on. Document:
+
+Which variable(s) you used and why. Include the variable code.
+Which years and survey (acs5 vs acs1) you used and why.
+What you had to assume, because the article does not say.
+State clearly whether the two periods the article compares overlap. If they do, say what that means for any conclusion drawn from the comparison.
+
+---
+
+## Choosing what to measure
+
+```
+my_state <- "FL"        # two-letter abbreviation, in quotes
+my_variable <- "B01002_001"     # the variable code, in quotes
+```
