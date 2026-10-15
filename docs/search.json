@@ -109,7 +109,7 @@
     "href": "weekly-notes/index.html",
     "title": "Weekly Notes",
     "section": "",
-    "text": "Notes from each week of MUSA 5080. New entries appear here automatically — add a .qmd file to this folder and render.\n\n\n\n\n\n\n\n\n\n\n\nWeek 2: dplyr and Census\n\n\nTable functions and acs data.\n\n\n\n\n\nSep 4, 2026\n\n\n\n\n\n\n\nWeek 1: Getting Set Up\n\n\nFirst impressions, and getting the workflow running.\n\n\n\n\n\nAug 28, 2026\n\n\n\n\n\nNo matching items"
+    "text": "Notes from each week of MUSA 5080. New entries appear here automatically — add a .qmd file to this folder and render.\n\n\n\n\n\n\n\n\n\n\n\nWeek 6 Notes: Feature Engineering\n\n\n\n\n\n\n\n\nOct 9, 2026\n\n\n\n\n\n\n\nWeek 2: dplyr and Census\n\n\nTable functions and acs data.\n\n\n\n\n\nSep 4, 2026\n\n\n\n\n\n\n\nWeek 1: Getting Set Up\n\n\nFirst impressions, and getting the workflow running.\n\n\n\n\n\nAug 28, 2026\n\n\n\n\n\nNo matching items"
   },
   {
     "objectID": "data/readme.html",
@@ -338,9 +338,9 @@
   {
     "objectID": "practice/week4_lab_challenge.html",
     "href": "practice/week4_lab_challenge.html",
-    "title": "Assignment 3: WVerify the Claim",
+    "title": "Week 4 Lab: Who Does Indego Reach?",
     "section": "",
-    "text": "Pull the ACS data the article appears to rely on. Document:\nWhich variable(s) you used and why. Include the variable code. Which years and survey (acs5 vs acs1) you used and why. What you had to assume, because the article does not say. State clearly whether the two periods the article compares overlap. If they do, say what that means for any conclusion drawn from the comparison.\n\n\n\nlibrary(tidyverse)\nlibrary(tidycensus)"
+    "text": "This guided lab contains code blanks, so execution is off by default and the portfolio site can render it as a handout. After filling in the code, change eval: false to eval: true in this document’s YAML to run the chunks.\nThis is a Lab: it’s ungraded and done in class. You work in teams of 3–4.\nType the code. Don’t copy and paste it. Blanks look like ___. Fill them in, then run the chunk.\nThe first hour (Parts 1–5) is guided and builds your toolkit. The last part is the challenge: your team answers one policy question and defends one decision. At the end, the presenter from each team is chosen at random, so everyone needs to understand every step.\n\nThe question: Indego says it serves low-income Philadelphians. Which low-income tracts are farthest from a station, and how sure are we that they’re low-income?"
   },
   {
     "objectID": "practice/week4_lab_challenge.html#setup",
@@ -397,5 +397,201 @@
     "title": "Assignment 3: Verify the Claim - Poverty Change in Philadelphia",
     "section": "Part 4 — Rewrite",
     "text": "Part 4 — Rewrite\nPhiladelphia’s poverty changes were uneven between 2006–2010 and 2013–2017. Among 376 census tracts with usable estimates, 36 showed a statistically detectable increase in poverty rates and 27 showed a detectable decrease at 90% confidence. Changes in the other 313 tracts were too uncertain to distinguish from zero. Another 8 tracts could not be compared because their poverty rates were undefined in at least one period. These findings support increases in some parts of the city, but they do not establish Eastwick’s reported rise from 12% to 26% or its ranking among neighborhoods. Checking those claims requires the tract groupings used to define each neighborhood."
+  },
+  {
+    "objectID": "weekly-notes/week-06.html",
+    "href": "weekly-notes/week-06.html",
+    "title": "Week 6 Notes: Feature Engineering",
+    "section": "",
+    "text": "A linear model draws straight lines through the features it receives. Feature engineering changes or adds predictors so that a linear model can represent skew, curves, group differences, and place-level variation.\nThe lecture evaluates changes by cross-validated RMSE, not by p-values. To compare models fairly, use the same observations and the same cross-validation folds throughout.\n\n\n\n\n\n\n\n\nFeature change\nWhat it can do for predictions\nHow to read coefficients\n\n\n\n\nLog\nHandle skew and nonlinear scaling\nOften changes the unit to a percentage interpretation\n\n\nSquared term\nLet a relationship curve\nThe linear and squared terms must be interpreted together\n\n\nCategory\nRepresent groups or jumps\nEach coefficient compares a group to a reference\n\n\nInteraction\nLet a slope vary by group\nThe effect depends on the group\n\n\nFixed effect\nAccount for unmeasured differences among places\nDescribes adjusted place differences; it does not explain their causes"
+  },
+  {
+    "objectID": "weekly-notes/week-06.html#why-log",
+    "href": "weekly-notes/week-06.html#why-log",
+    "title": "Week 6 Notes: Feature Engineering",
+    "section": "3.1 Why log?",
+    "text": "3.1 Why log?\nIncome and rent can be right-skewed. A few very high values can pull a straight-line fit. A log compresses the upper tail and makes equal percentage changes comparable distances. For example, moving from $20,000 to $40,000 may matter more than moving from $180,000 to $200,000, even though both changes are $20,000.\n\n3.1.1 Log a predictor\nf_logx &lt;- rent ~ log(income) + pct_renter + bldg_age + dist_ch_mi\nm_logx &lt;- lm(f_logx, data = tracts)\n\nb &lt;- coef(m_logx)[\"log(income)\"]\nb / 100             # approximate rent change for a 1% income increase\nb * log(1.10)       # exact model-implied change for a 10% increase\nIn a level–log model (y ~ log(x)), a 1% increase in x is associated with approximately β / 100 units of y, holding other variables constant."
+  },
+  {
+    "objectID": "weekly-notes/week-06.html#zeros-log1p",
+    "href": "weekly-notes/week-06.html#zeros-log1p",
+    "title": "Week 6 Notes: Feature Engineering",
+    "section": "3.2 Zeros: log1p()",
+    "text": "3.2 Zeros: log1p()\nlog(0) is negative infinity. This causes problems for variables that can be zero, such as counts of crimes, trees, or 311 calls. Use log1p(x), which calculates log(x + 1):\nlog1p(c(0, 1, 10, 100))\nThe percentage interpretation is approximate, especially for small values."
+  },
+  {
+    "objectID": "weekly-notes/week-06.html#log-the-outcome",
+    "href": "weekly-notes/week-06.html#log-the-outcome",
+    "title": "Week 6 Notes: Feature Engineering",
+    "section": "3.3 Log the outcome",
+    "text": "3.3 Log the outcome\nf_logy &lt;- log(rent) ~ log(income) + pct_renter + bldg_age + dist_ch_mi\nm_logy &lt;- lm(f_logy, data = tracts)\nIn a log–level model (log(y) ~ x), a one-unit increase in x is associated with approximately 100 × β percent change in y. For a larger coefficient, calculate the exact percentage as (exp(β) - 1) × 100.\nIn a log–log model (log(y) ~ log(x)), β is an elasticity: a 1% increase in x is associated with approximately a β% change in y.\n\n\n\n\n\n\n\nModel form\nApproximate coefficient interpretation\n\n\n\n\nLevel–level: y ~ x\n+1 unit of x → β units of y\n\n\nLevel–log: y ~ log(x)\n+1% of x → β / 100 units of y\n\n\nLog–level: log(y) ~ x\n+1 unit of x → about 100 × β% change in y\n\n\nLog–log: log(y) ~ log(x)\n+1% of x → about β% change in y\n\n\n\nRMSE trap: RMSE must be on the same outcome scale to compare models. A residual RMSE from a model of log(rent) is in log-dollars; it cannot be compared with the baseline RMSE in dollars. During cross-validation, exponentiate predictions before calculating RMSE. Directly exponentiating a predicted log often estimates closer to the median than the mean, so it can underpredict somewhat; the lecture treats this simple back-transformation as adequate for the assignment."
+  },
+  {
+    "objectID": "weekly-notes/week-06.html#fixed-effects-and-cross-validation",
+    "href": "weekly-notes/week-06.html#fixed-effects-and-cross-validation",
+    "title": "Week 6 Notes: Feature Engineering",
+    "section": "7.1 Fixed effects and cross-validation",
+    "text": "7.1 Fixed effects and cross-validation\nA fixed effect can only predict groups represented in the training data. If a district is absent from a training fold, its coefficient is unavailable and prediction can fail. Count group sizes before cross-validation. The lecture’s rule of thumb is around 10 or more observations per group for 10-fold CV, with more being safer.\nPossible responses to very small groups:\n\nMerge them with a geographically or substantively sensible neighbor (preferred when defensible).\nLump small groups into “Other” for a quick solution, while recognizing the group may combine unrelated places.\nUse a coarser geography.\n\nThe example merges small districts with nearby districts for the CV predictor. It emphasizes that FE is a kind of place memorization and cannot generalize to a never-seen place.\n\n\n\n\n\n\n\nFixed effects\nSpatial features\n\n\n\n\nCapture unmeasured differences associated with a group\nRepresent measured conditions such as proximity to transit, parks, or crime\n\n\nCannot predict an unseen group\nCan be computed wherever the feature is available\n\n\nGroup boundaries and scale are inherited\nFeature scale can be chosen\n\n\nTell you where adjusted differences are\nHelp describe what may explain differences\n\n\n\nThey can complement each other: spatial features explain measured conditions, while FE can account for remaining place-level differences."
+  },
+  {
+    "objectID": "practice/week5_lab_challenge.html",
+    "href": "practice/week5_lab_challenge.html",
+    "title": "Week 5 In-Class Lab: Where the Model Is Wrong",
+    "section": "",
+    "text": "This guided lab contains code blanks, so execution is off by default and the portfolio site can render it as a handout. After filling in the code, change eval: false to eval: true in this document’s YAML to run the chunks.\nThe first part of the lab (Parts 0–7) is guided and builds your toolkit. Type the code yourself; don’t copy and paste. Fill in every ___. The last part is the challenge: your team builds the best rent prediction model it can and defends it. At the end, the presenter from each team is chosen at random, so everyone needs to understand every step."
+  },
+  {
+    "objectID": "practice/week5_lab_challenge.html#part-0-setup",
+    "href": "practice/week5_lab_challenge.html#part-0-setup",
+    "title": "Week 5 In-Class Lab: Where the Model Is Wrong",
+    "section": "Part 0: Setup",
+    "text": "Part 0: Setup\n\nlibrary(tidyverse)\nlibrary(tidycensus)\nlibrary(sf)\nlibrary(caret)     # cross-validation\nlibrary(lmtest)    # Breusch-Pagan test\n\n# Your key lives in .Renviron. Never paste it here.\nSys.getenv(\"CENSUS_API_KEY\") != \"\"   # should print TRUE"
+  },
+  {
+    "objectID": "practice/week5_lab_challenge.html#part-1-rebuild-the-table-you-already-know",
+    "href": "practice/week5_lab_challenge.html#part-1-rebuild-the-table-you-already-know",
+    "title": "Week 5 In-Class Lab: Where the Model Is Wrong",
+    "section": "Part 1: Rebuild the table you already know",
+    "text": "Part 1: Rebuild the table you already know\nThis is last week’s pull with a few more variables. Every line should look familiar.\n\nphilly_tracts &lt;- get_acs(\n  geography = \"tract\",\n  state = \"PA\",\n  county = \"Philadelphia\",\n  variables = c(\n    med_rent   = \"B25064_001\",   # median gross rent (our Y)\n    med_inc    = \"B19013_001\",   # median household income\n    total_pop  = \"B01003_001\",\n    occ_units  = \"B25003_001\",   # occupied housing units\n    renter_occ = \"B25003_003\",   # renter-occupied units\n    edu_total  = \"B15003_001\",   # population 25+\n    ba         = \"B15003_022\",\n    ma         = \"B15003_023\",\n    prof       = \"B15003_024\",\n    phd        = \"B15003_025\"\n  ),\n  year = 2023,\n  output = \"wide\",\n  geometry = TRUE\n) %&gt;%\n  st_transform(2272)          # Pennsylvania South State Plane, feet\n\nNow build the variables. A data frame goes in, a data frame comes out.\n\nphilly_tracts &lt;- philly_tracts %&gt;%\n  mutate(\n    pct_renter = renter_occE / occ_unitsE * 100,\n    pct_ba     = (baE + maE + profE + phdE) / edu_totalE * 100,\n    rent_se    = med_rentM / 1.645,\n    rent_cv    = rent_se / renter_occE * 100\n  )\n\nBring back the stations and count how many sit within half a mile of each tract. This is Week 4 with one new function.\n\nstations &lt;- st_read(\"https://www.rideindego.com/stations/json/\", quiet = TRUE) %&gt;%\n  st_transform(st_crs(philly_tracts))\n\nphilly_tracts &lt;- philly_tracts %&gt;%\n  mutate(n_stations = lengths(st_is_within_distance(., stations, dist = 2640)))\n\nStop and look: st_is_within_distance() returns a list, one element per tract, holding the stations within range. What does lengths() do to that list?\n\nWhich tracts can we model?\nA regression can’t use a row with a missing Y or X. R will quietly drop those rows, and later your residuals won’t line up with your tracts. So drop them yourself, on purpose, and count.\n\nnrow(philly_tracts)\n\ntracts &lt;- philly_tracts %&gt;%\n  filter(total_popE &gt; 0,\n         !is.na(med_rentE),\n         !is.na(med_incE),\n         !is.na(pct_ba),\n         !is.na(pct_renter))\n\nnrow(tracts)\n\nRule from Week 4, again: how many tracts did you lose? Which kind of tract has no median rent? (Hint: think about who lives there.)"
+  },
+  {
+    "objectID": "practice/week5_lab_challenge.html#section",
+    "href": "practice/week5_lab_challenge.html#section",
+    "title": "Week 5 In-Class Lab: Where the Model Is Wrong",
+    "section": "31",
+    "text": "31"
+  },
+  {
+    "objectID": "practice/week5_lab_challenge.html#part-2-look-before-you-model",
+    "href": "practice/week5_lab_challenge.html#part-2-look-before-you-model",
+    "title": "Week 5 In-Class Lab: Where the Model Is Wrong",
+    "section": "Part 2: Look before you model",
+    "text": "Part 2: Look before you model\nThe Week 3 habit comes first: plot the relationship before you fit anything.\n\nggplot(tracts, aes(x = med_incE, y = med_rentE)) +\n  geom_point(alpha = 0.5) +\n  geom_smooth(method = \"lm\", se = FALSE, color = \"red\") +\n  scale_x_continuous(labels = scales::dollar) +\n  scale_y_continuous(labels = scales::dollar) +\n  labs(x = \"Median household income\", y = \"Median gross rent\",\n       title = \"Rent and income, Philadelphia tracts\") +\n  theme_minimal()\n\nStop and look: Does a straight line describe this cloud well everywhere, or does it bend? Where are the points that sit far from the line?"
+  },
+  {
+    "objectID": "practice/week5_lab_challenge.html#it-fits-weell-and-its-not-bending.-there-is-one-at-200000-household-income-but-get-a-rent-for-a-little-more-than-1000-rent.",
+    "href": "practice/week5_lab_challenge.html#it-fits-weell-and-its-not-bending.-there-is-one-at-200000-household-income-but-get-a-rent-for-a-little-more-than-1000-rent.",
+    "title": "Week 5 In-Class Lab: Where the Model Is Wrong",
+    "section": "It fits weell, and its not bending. There is one at $200000 household income but get a rent for a little more than $1000 rent.",
+    "text": "It fits weell, and its not bending. There is one at $200000 household income but get a rent for a little more than $1000 rent."
+  },
+  {
+    "objectID": "practice/week5_lab_challenge.html#part-3-fit-the-line",
+    "href": "practice/week5_lab_challenge.html#part-3-fit-the-line",
+    "title": "Week 5 In-Class Lab: Where the Model Is Wrong",
+    "section": "Part 3: Fit the line",
+    "text": "Part 3: Fit the line\n\nm1 &lt;- lm(med_rentE ~ med_incE, data = tracts)\nsummary(m1)\n\nUnits first. Translate the income coefficient into something a person would notice:\n\ncoef(m1)[\"med_incE\"] * 10000    # predicted rent change for +$10,000 of income\n\nWrite one sentence: “A tract with $10,000 more in median income has a predicted rent about $80.22 higher per month.”\nStop and look: The p-value is tiny. Does that tell you whether $80.22/month is a big effect? What would you need to know to decide?\nReject null hypos and its true."
+  },
+  {
+    "objectID": "practice/week5_lab_challenge.html#part-4-read-the-same-output-twice",
+    "href": "practice/week5_lab_challenge.html#part-4-read-the-same-output-twice",
+    "title": "Week 5 In-Class Lab: Where the Model Is Wrong",
+    "section": "Part 4: Read the same output twice",
+    "text": "Part 4: Read the same output twice\nAdd the other predictors.\n\nm2 &lt;- lm(med_rentE ~ med_incE + pct_renter + pct_ba + n_stations, data = tracts)\nsummary(m2)\n\nLook at the n_stations coefficient. Answer both questions in one or two sentences each:\n\nβ̂ reading: Can you tell the housing agency that bike share stations raise rents? Why or why not?\nYour answer:\nŷ reading: Should n_stations stay in a model whose only job is predicting rent? Why or why not?\nYour answer:\n\n\n\n\n\n\n\nNoteSame number, two questions\n\n\n\nIf your answers to 1 and 2 differ, that’s the point. For inference, a variable that stands in for something unmeasured is a problem. For prediction, it can be exactly why the model works.\n\n\nOne more check. Compare in-sample fit:\n\nsummary(m1)$r.squared\nsummary(m2)$___\n\nHold on to these numbers. Part 6 asks whether they mean what they seem to."
+  },
+  {
+    "objectID": "practice/week5_lab_challenge.html#part-5-uncertainty-in-input-data",
+    "href": "practice/week5_lab_challenge.html#part-5-uncertainty-in-input-data",
+    "title": "Week 5 In-Class Lab: Where the Model Is Wrong",
+    "section": "Part 5: Uncertainty in input data",
+    "text": "Part 5: Uncertainty in input data\nOur Y is an ACS estimate with its own margin of error. Add the residuals to the table and check whether the biggest misses happen where the estimate is least reliable.\n\ntracts &lt;- tracts %&gt;%\n  mutate(fitted_m2 = fitted(m2),\n         resid_m2  = residuals(___))\n\nggplot(tracts, aes(x = rent_cv, y = abs(resid_m2))) +\n  geom_point(alpha = 0.5) +\n  geom_smooth(se = FALSE) +\n  labs(x = \"CV of the median rent estimate (%)\",\n       y = \"Size of the model's miss ($)\",\n       title = \"Are the biggest misses in the noisiest tracts?\") +\n  theme_minimal()\n\nStop and look: If a tract’s rent estimate has a CV of 35%, how much of the model’s miss there could be survey noise rather than a model failure? What does that mean for flagging “tracts with rents above expectation”?"
+  },
+  {
+    "objectID": "practice/week5_lab_challenge.html#part-6-fit-vs.-prediction",
+    "href": "practice/week5_lab_challenge.html#part-6-fit-vs.-prediction",
+    "title": "Week 5 In-Class Lab: Where the Model Is Wrong",
+    "section": "Part 6: Fit vs. prediction",
+    "text": "Part 6: Fit vs. prediction\n\n\n\n\n\n\nWarningTwo different CVs\n\n\n\nWeek 3 CV = coefficient of variation: how noisy is one estimate? Today’s CV = cross-validation: how well does a model predict data it hasn’t seen? Same letters, unrelated ideas.\n\n\n\n6A: One train/test split\n\nset.seed(5080)\nn &lt;- nrow(tracts)\ntrain_idx &lt;- sample(1:n, size = 0.8 * n)\n\ntrain_data &lt;- tracts[train_idx, ]\ntest_data  &lt;- tracts[___, ]\n\nm2_train &lt;- lm(med_rentE ~ med_incE + pct_renter + pct_ba + n_stations,\n               data = train_data)\n\ntest_pred &lt;- predict(m2_train, newdata = ___)\n\nrmse_train &lt;- sqrt(mean(residuals(m2_train)^2))\nrmse_test  &lt;- sqrt(mean((test_data$med_rentE - test_pred)^2))\n\nc(train = rmse_train, test = rmse_test)\n\nStop and look: Which RMSE is larger? Why would you expect that? In words: “The model’s typical miss on tracts it hasn’t seen is about $___ per month.”\nChange the seed to any other number and rerun the chunk. Did the test RMSE change? That’s why one split isn’t enough.\n\n\n6B: 10-fold cross-validation\ncaret wants a plain data frame, so drop the geometry first. (The geometry isn’t a predictor, and train() will choke on it.)\n\nmodel_df &lt;- tracts %&gt;% st_drop_geometry()\n\nctrl &lt;- trainControl(method = \"cv\", number = ___)\n\nset.seed(5080)\ncv_m1 &lt;- train(med_rentE ~ med_incE,\n               data = model_df, method = \"lm\", trControl = ctrl)\n\nset.seed(5080)\ncv_m2 &lt;- train(med_rentE ~ med_incE + pct_renter + pct_ba + n_stations,\n               data = model_df, method = \"lm\", trControl = ctrl)\n\ncv_m1$results\ncv_m2$results\n\nSetting the same seed before each train() gives both models the same folds, so the comparison is fair.\nStop and look: Fill in the table.\n\n\n\n\nIn-sample R²\nCV RMSE\n\n\n\n\nm1\n\n\n\n\nm2\n\n\n\n\n\nDid adding variables improve R²? Did it improve CV RMSE by as much? For a prediction task, which column is the grade?"
+  },
+  {
+    "objectID": "practice/week5_lab_challenge.html#part-7-where-is-the-model-wrong",
+    "href": "practice/week5_lab_challenge.html#part-7-where-is-the-model-wrong",
+    "title": "Week 5 In-Class Lab: Where the Model Is Wrong",
+    "section": "Part 7: Where is the model wrong?",
+    "text": "Part 7: Where is the model wrong?\n\n7A: Residuals vs. fitted\n\nggplot(tracts, aes(x = fitted_m2, y = resid_m2)) +\n  geom_point(alpha = 0.5) +\n  geom_hline(yintercept = 0, color = \"red\") +\n  labs(x = \"Predicted rent\", y = \"Residual (actual − predicted)\") +\n  theme_minimal()\n\nbptest(m2)\n\nStop and look: Random cloud, funnel, or curve? If it’s a funnel, the predictions aren’t biased, but one RMSE hides the fact that the model misses by much more in some tracts. Which tracts?\n\n\n7B: The map\nThe residuals are already a column in an sf data frame. Mapping them is one geom_sf() away.\n\nggplot(tracts) +\n  geom_sf(aes(fill = ___), color = NA) +\n  scale_fill_gradient2(low = \"#2166ac\", mid = \"grey95\", high = \"#b2182b\",\n                       midpoint = 0, labels = scales::dollar) +\n  theme_void() +\n  labs(title = \"Where the rent model is wrong\",\n       subtitle = \"Red = rent higher than predicted · Blue = lower than predicted\",\n       fill = \"Residual\")\n\nStop and look: If the errors were random, the map would look speckled. Does it? Where do the reds sit together? What might those places have in common that the model doesn’t know about?\nWrite down your answer. We’ll come back to it in Weeks 6 and 7."
+  },
+  {
+    "objectID": "practice/week5_lab_challenge.html#part-8-the-challenge",
+    "href": "practice/week5_lab_challenge.html#part-8-the-challenge",
+    "title": "Week 5 In-Class Lab: Where the Model Is Wrong",
+    "section": "Part 8: The Challenge",
+    "text": "Part 8: The Challenge\nYour team’s job: build the best model for predicting tract median rent, then use it to answer the agency’s question.\n\nRules\n\nThe grade is 10-fold CV RMSE. Use model_df (or tracts) and run set.seed(5080) directly before train(), exactly as in Part 6B, so every team is tested on the same folds.\nDon’t drop rows. If you add a variable with missing values, you change the folds and the comparison stops being fair. Fill the gaps or choose a different variable.\nYou may add any ACS variables (use load_variables(2023, \"acs5\") to browse) and any spatial feature you can build with Week 4 tools: distances, buffers, counts.\nYou may not use anything built from rent itself. That rules out med_rentM, rent_cv, rent burden (B25071), and the rent distribution tables (B25063). Ask yourself: would the agency have this variable for a tract whose rent it’s trying to predict? If not, using it is cheating the test. That’s called leakage.\n\n\n\nDeliver\n\nYour CV RMSE, in dollars, written as a sentence.\nOne feature you added, and why. What did you think it would capture that the census variables miss? Did it help?\nOne coefficient, read twice. Pick a variable in your final model and give its β̂ reading and its ŷ reading in one sentence each.\nThe agency’s list. Using your final model fit to all tracts, find the five tracts with the largest positive residuals (rent well above expectation). For each, report the residual and the rent CV. Which of the five would you tell the agency to trust, and which might be fog?\nYour residual map. Did your added features make the clusters from Part 7B shrink?\n\n\n# Your team's code here\n\n\n\nScoring (for bragging rights, not grades)\n\n\n\n\nPoints\n\n\n\n\nLowest CV RMSE in the room\n3\n\n\nSecond and third lowest\n2 / 1\n\n\nFeature explanation is clear and specific\n2\n\n\nCoefficient read correctly both ways\n2\n\n\nAgency list accounts for reliability (Week 3)\n2\n\n\nRandomly chosen presenter explains the model clearly\n3\n\n\nBreaks a rule (leakage or dropped rows)\n−5\n\n\n\n\n\nBefore you present, discuss\n\nOne of your variables is not statistically significant, but removing it makes CV RMSE worse. Do you keep it? What would your Spatial Statistics instructor say, and why is neither of you wrong?\nA council member sees your model and says, “So your model proves that renters drive up rents.” What do you say?\nIf the agency uses your top-five list to target inspections, whose rents does a model error hurt most?"
+  },
+  {
+    "objectID": "practice/week5_lab_challenge.html#if-youre-curious-ungraded-no-extra-points",
+    "href": "practice/week5_lab_challenge.html#if-youre-curious-ungraded-no-extra-points",
+    "title": "Week 5 In-Class Lab: Where the Model Is Wrong",
+    "section": "If you’re curious (ungraded, no extra points)",
+    "text": "If you’re curious (ungraded, no extra points)\n\nReplace med_incE with log(med_incE). Does the curve in Part 2 straighten? Does CV RMSE improve? How do you read the new coefficient?\nTry a random forest: change method = \"lm\" to method = \"ranger\" (run install.packages(\"ranger\") first). Does it beat your linear model? By how much? Is the gain worth losing the ability to explain the model to the agency?\nYour residual map probably still has clusters. Build one spatial feature that you think would absorb them, add it, and remap. That’s next week in miniature."
+  },
+  {
+    "objectID": "practice/week4_lab_challenge.html#how-this-works",
+    "href": "practice/week4_lab_challenge.html#how-this-works",
+    "title": "Week 4 Lab: Who Does Indego Reach?",
+    "section": "",
+    "text": "This guided lab contains code blanks, so execution is off by default and the portfolio site can render it as a handout. After filling in the code, change eval: false to eval: true in this document’s YAML to run the chunks.\nThis is a Lab: it’s ungraded and done in class. You work in teams of 3–4.\nType the code. Don’t copy and paste it. Blanks look like ___. Fill them in, then run the chunk.\nThe first hour (Parts 1–5) is guided and builds your toolkit. The last part is the challenge: your team answers one policy question and defends one decision. At the end, the presenter from each team is chosen at random, so everyone needs to understand every step.\n\nThe question: Indego says it serves low-income Philadelphians. Which low-income tracts are farthest from a station, and how sure are we that they’re low-income?"
+  },
+  {
+    "objectID": "practice/week4_lab_challenge.html#part-0-setup",
+    "href": "practice/week4_lab_challenge.html#part-0-setup",
+    "title": "Week 4 Lab: Who Does Indego Reach?",
+    "section": "Part 0: Setup",
+    "text": "Part 0: Setup\n\nlibrary(tidyverse)\nlibrary(tidycensus)\nlibrary(sf)\n\n# Your key lives in .Renviron. Never paste it here.\n# tidycensus reads CENSUS_API_KEY automatically.\nSys.getenv(\"CENSUS_API_KEY\") != \"\"   # should print TRUE"
+  },
+  {
+    "objectID": "practice/week4_lab_challenge.html#part-1-the-same-pull-as-week-3-plus-one-argument",
+    "href": "practice/week4_lab_challenge.html#part-1-the-same-pull-as-week-3-plus-one-argument",
+    "title": "Week 4 Lab: Who Does Indego Reach?",
+    "section": "Part 1: The same pull as Week 3, plus one argument",
+    "text": "Part 1: The same pull as Week 3, plus one argument\nThis is the same get_acs() call you already know. The only new part is geometry = TRUE.\n\nphilly_tracts &lt;- get_acs(\n  geography = \"tract\",\n  state = \"PA\",\n  county = \"___\",\n  variables = c(med_inc = \"B19013_001\",\n                total_pop = \"B01003_001\"),\n  year = 2023,\n  output = \"wide\",\n  geometry = ___\n)\n\nclass(philly_tracts)\nglimpse(philly_tracts)\n\nStop and look: What does class() show? Which column is new?\nNow repeat the Week 3 steps. A data frame goes in, a data frame comes out. The geometry column comes along automatically.\n\nphilly_tracts &lt;- philly_tracts %&gt;%\n  filter(total_popE &gt; 0) %&gt;%\n  mutate(\n    med_inc_se = med_incM / ___,\n    med_inc_cv = (med_inc_se / med_incE) * 100,\n    reliability = case_when(\n      med_inc_cv &lt; 12  ~ \"High\",\n      med_inc_cv &lt;= 40 ~ \"Moderate\",\n      TRUE             ~ \"Low\"\n    )\n  )\n\n# Did geometry survive? It should.\nnames(philly_tracts)\n\nYour first map. It’s just ggplot with a new geom:\n\nggplot(philly_tracts) +\n  geom_sf(aes(fill = ___), color = NA) +\n  scale_fill_viridis_c(labels = scales::dollar) +\n  theme_void() +\n  labs(title = \"Median household income, Philadelphia tracts\",\n       fill = NULL)\n\nQuick check: How many tracts have NA income even though they have people living in them? Write the code to count them.\n\nphilly_tracts %&gt;%\n  filter(is.na(___)) %&gt;%\n  nrow()"
+  },
+  {
+    "objectID": "practice/week4_lab_challenge.html#part-1b-join-by-what",
+    "href": "practice/week4_lab_challenge.html#part-1b-join-by-what",
+    "title": "Week 4 Lab: Who Does Indego Reach?",
+    "section": "Part 1b: Join by what",
+    "text": "Part 1b: Join by what\nHow much has income changed since 2015? Pull the older estimates. No geometry is needed, because this is just a table.\n\nincome_15 &lt;- get_acs(\n  geography = \"tract\",\n  state = \"PA\",\n  county = \"Philadelphia\",\n  variables = c(med_inc_15 = \"B19013_001\"),\n  year = 2015,\n  output = \"wide\",\n  geometry = FALSE\n) %&gt;%\n  select(GEOID, med_inc_15E, med_inc_15M)\n\nnrow(income_15)\nnrow(philly_tracts)\n\nStop and look: The row counts are different. Before you join, predict why.\nNow join the 2015 table onto your tracts. The key is the column both tables share.\n\nphilly_tracts &lt;- philly_tracts %&gt;%\n  left_join(income_15, by = \"___\")\n\nnrow(philly_tracts)   # did the row count change?\n\nThe rule: after every join, count rows and count NAs.\n\nphilly_tracts %&gt;%\n  st_drop_geometry() %&gt;%\n  summarize(\n    n_tracts = n(),\n    no_2015_match = sum(is.na(___))\n  )\n\nNow look at which tracts failed to match:\n\n# 2023 tracts with no 2015 partner\nphilly_tracts %&gt;%\n  st_drop_geometry() %&gt;%\n  filter(is.na(med_inc_15E)) %&gt;%\n  select(GEOID, NAME) %&gt;%\n  head(10)\n\n# 2015 tracts with no 2023 partner: anti_join keeps rows with NO match\nincome_15 %&gt;%\n  anti_join(st_drop_geometry(philly_tracts), by = \"GEOID\") %&gt;%\n  head(10)\n\nDiscuss as a team: Did these places move? What changed between 2015 and 2023? Why can’t left_join() fix this? Keep your answer in mind; Part 3 comes back to it.\n\n\n\n\n\n\nNote\n\n\n\nSome NAs aren’t boundary changes. A tract can match but have NA income because the Census suppressed the estimate. How would you tell the two kinds of NA apart?"
+  },
+  {
+    "objectID": "practice/week4_lab_challenge.html#part-2-bring-in-the-stations",
+    "href": "practice/week4_lab_challenge.html#part-2-bring-in-the-stations",
+    "title": "Week 4 Lab: Who Does Indego Reach?",
+    "section": "Part 2: Bring in the stations",
+    "text": "Part 2: Bring in the stations\nIndego publishes live station locations as GeoJSON. st_read() reads it directly from the URL.\n\nstations &lt;- st_read(\"https://www.rideindego.com/stations/json/\", quiet = TRUE)\n\nnrow(stations)\nglimpse(stations)\n\nNow check the CRS of both layers.\n\nst_crs(philly_tracts)$epsg\nst_crs(___)$epsg\n\nPredict before you run: The two numbers are different. What will happen if you try to join them?\n\nst_join(stations, philly_tracts)\n\nThat error is sf protecting you. Fix it by translating both layers into Pennsylvania South State Plane, EPSG 2272.\n\n\n\n\n\n\nWarningLabel or translation?\n\n\n\nst_set_crs() writes a label when the CRS is missing. st_transform() converts coordinates into a different CRS. Both layers here already have a CRS. Which function do you need?\n\n\n\nphilly_tracts &lt;- philly_tracts %&gt;% ___(crs = 2272)\nstations      &lt;- stations %&gt;% ___(crs = 2272)\n\nst_crs(philly_tracts)$units   # what units are we in now?\n\nWrite down the units. Every number you type from now on is in these units."
+  },
+  {
+    "objectID": "practice/week4_lab_challenge.html#part-3-join-by-where",
+    "href": "practice/week4_lab_challenge.html#part-3-join-by-where",
+    "title": "Week 4 Lab: Who Does Indego Reach?",
+    "section": "Part 3: Join by where",
+    "text": "Part 3: Join by where\nIn Part 1b, the join failed because it matched on a label (GEOID), and the label changed. st_join() matches on location instead: a row is matched to whatever it sits on top of. Stations don’t have a GEOID column, and they don’t need one.\nEvery station gets its tract’s attributes:\n\nstations_with_tract &lt;- st_join(stations, philly_tracts)\n\nstations_with_tract %&gt;%\n  st_drop_geometry() %&gt;%\n  select(name, GEOID, med_incE, reliability) %&gt;%\n  head()\n\nNow go the other way and count stations per tract. The first route is the Week 2 collapse pattern:\n\nstation_counts &lt;- stations_with_tract %&gt;%\n  st_drop_geometry() %&gt;%\n  ___(GEOID)\n\nThe second route counts directly:\n\nphilly_tracts &lt;- philly_tracts %&gt;%\n  mutate(n_stations = lengths(st_intersects(., stations)))\n\n\nCheck your work\n\nsum(philly_tracts$n_stations)\nnrow(stations)\n\nThese probably don’t match. Discuss as a team: Why not? Find at least one station that explains the gap.\nHints: Look for stations where GEOID is NA in stations_with_tract. For double counts, look for stations that intersect more than one tract: which(lengths(st_intersects(stations, philly_tracts)) &gt; 1)."
+  },
+  {
+    "objectID": "practice/week4_lab_challenge.html#part-4-how-far-is-the-nearest-station",
+    "href": "practice/week4_lab_challenge.html#part-4-how-far-is-the-nearest-station",
+    "title": "Week 4 Lab: Who Does Indego Reach?",
+    "section": "Part 4: How far is the nearest station?",
+    "text": "Part 4: How far is the nearest station?\nst_distance() returns a matrix, not a column. Look at its shape first:\n\ncentroids &lt;- st_centroid(st_geometry(philly_tracts))\n\ndim(st_distance(centroids, stations))\n\nInstead, find the nearest station for each tract, then measure only that one distance:\n\nnearest_idx &lt;- st_nearest_feature(centroids, ___)\n\nphilly_tracts &lt;- philly_tracts %&gt;%\n  mutate(\n    dist_ft = as.numeric(\n      st_distance(centroids, stations[nearest_idx, ], by_element = ___)\n    ),\n    dist_mi = dist_ft / ___\n  )\n\nsummary(philly_tracts$dist_mi)"
+  },
+  {
+    "objectID": "practice/week4_lab_challenge.html#part-5-buffers-filters-and-cutting-the-dough",
+    "href": "practice/week4_lab_challenge.html#part-5-buffers-filters-and-cutting-the-dough",
+    "title": "Week 4 Lab: Who Does Indego Reach?",
+    "section": "Part 5: Buffers, filters, and cutting the dough",
+    "text": "Part 5: Buffers, filters, and cutting the dough\nBuild a half-mile zone around every station and merge the circles into one shape. Remember your units.\n\nstation_zone &lt;- stations %&gt;%\n  st_buffer(dist = ___) %&gt;%\n  st_union()\n\nPick whole cookies: which tracts don’t touch the zone at all?\n\noutside_zone &lt;- philly_tracts %&gt;%\n  st_filter(station_zone, .predicate = ___)\n\nnrow(outside_zone)\n\nCut the dough: what share of each tract’s area falls inside the zone?\n\nphilly_tracts &lt;- philly_tracts %&gt;%\n  mutate(tract_area = as.numeric(st_area(.)))\n\ncovered &lt;- philly_tracts %&gt;%\n  st_intersection(station_zone) %&gt;%\n  mutate(covered_area = as.numeric(st_area(.))) %&gt;%\n  st_drop_geometry() %&gt;%\n  select(GEOID, covered_area)\n\nphilly_tracts &lt;- philly_tracts %&gt;%\n  left_join(covered, by = \"GEOID\") %&gt;%\n  mutate(pct_covered = replace_na(covered_area / tract_area, 0) * 100)\n\nNotice: that last step is the left_join() from Part 1b. It’s a join by what (GEOID), used to bring a join-by-where result back into the table. The two kinds of join work together."
+  },
+  {
+    "objectID": "practice/week4_lab_challenge.html#part-6-the-challenge",
+    "href": "practice/week4_lab_challenge.html#part-6-the-challenge",
+    "title": "Week 4 Lab: Who Does Indego Reach?",
+    "section": "Part 6: The Challenge",
+    "text": "Part 6: The Challenge\nYou now have three different definitions of “has access”:\n\nDistance: the tract centroid is within X miles of a station (dist_mi)\nTouch: the tract touches the half-mile zone at all (st_filter)\nCoverage: at least Y% of the tract’s area is inside the zone (pct_covered)\n\n\nYour team’s task\n\nDefine “low-income.” For example, you could use the bottom quartile of tract median income, or a dollar threshold. Pick one and write it down.\nDefine “access.” Choose one of the three definitions above and set its threshold.\nAnswer the question. Which low-income tracts lack access? Produce:\n\nThe count of low-income tracts without access\nA map showing them (a geom_sf() layer plus the stations)\nThe reliability breakdown: of those tracts, how many have High / Moderate / Low reliability income estimates?\n\nDefend one decision in 2–3 sentences. Why this access definition and not another? How would your count change if you used a different one?\n\n\n# Your team's code here\n\n\n\nScoring (for bragging rights, not grades)\n\n\n\n\n\n\n\n\nPoints\n\n\n\n\nCount is correct for your stated definitions\n2\n\n\nMap shows the right tracts and the stations, with a title that states your definitions\n2\n\n\nReliability breakdown included\n1\n\n\nRandomly chosen presenter explains the decision clearly\n3\n\n\nTeam shows how the count changes under a second definition\n+1\n\n\n\n\n\nBefore you present, discuss\n\nIf a tract is “low-income” with a CV of 45%, does it belong on your list? What would you tell Indego about it?\nYour three access definitions give different counts. Which one would an Indego planner prefer? Which one would a neighborhood advocate prefer?"
+  },
+  {
+    "objectID": "practice/week4_lab_challenge.html#if-youre-curious",
+    "href": "practice/week4_lab_challenge.html#if-youre-curious",
+    "title": "Week 4 Lab: Who Does Indego Reach?",
+    "section": "If you’re curious",
+    "text": "If you’re curious\n\nIndego stations have a totalDocks property. Does “access” mean the same thing next to a 10-dock station and a 35-dock station?\nReplace the centroid with st_point_on_surface(). Does any tract’s distance change a lot? Why might a centroid fall in an odd place for some tract shapes?\nStraight-line distance ignores the Schuylkill, I-95, and rail yards. Which tracts do you suspect are farther in practice than your map shows?"
   }
 ]

@@ -1,0 +1,271 @@
+---
+title: "Week 6 Notes: Feature Engineering"
+subtitle: "Transformations, categories, interactions, and fixed effects"
+author: "MUSA 5080"
+date: 2026-10-09
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-fold: true
+---
+
+# Big picture
+
+A linear model draws straight lines through the features it receives. **Feature engineering** changes or adds predictors so that a linear model can represent skew, curves, group differences, and place-level variation.
+
+The lecture evaluates changes by **cross-validated RMSE**, not by p-values. To compare models fairly, use the same observations and the same cross-validation folds throughout.
+
+| Feature change | What it can do for predictions | How to read coefficients |
+|---|---|---|
+| Log | Handle skew and nonlinear scaling | Often changes the unit to a percentage interpretation |
+| Squared term | Let a relationship curve | The linear and squared terms must be interpreted together |
+| Category | Represent groups or jumps | Each coefficient compares a group to a reference |
+| Interaction | Let a slope vary by group | The effect depends on the group |
+| Fixed effect | Account for unmeasured differences among places | Describes adjusted place differences; it does not explain their causes |
+
+# Example data and model comparison
+
+The examples use Philadelphia census tracts and median gross rent as the outcome. Predictors include median household income, building age, renter share, distance from City Hall, and later planning district.
+
+The lecture builds the predictors once and removes incomplete observations once. That leaves 377 tracts in the slide example. Each model should use those same rows; otherwise its RMSE is not directly comparable.
+
+```r
+tracts <- tracts_raw %>%
+  mutate(
+    rent = rentE,
+    rent_moe = rentM,
+    income = incomeE,
+    bldg_age = 2023 - yr_builtE,
+    pct_renter = 100 * hh_renterE / hh_totalE,
+    dist_ch_mi = as.numeric(st_distance(geometry, city_hall)) / 5280
+  ) %>%
+  select(GEOID, rent, rent_moe, income, bldg_age, pct_renter, dist_ch_mi) %>%
+  filter(!is.na(rent), !is.na(income), !is.na(bldg_age), !is.na(pct_renter))
+```
+
+Use fixed folds for every model:
+
+```r
+set.seed(5080)
+folds <- sample(rep(1:10, length.out = nrow(tracts)))
+
+cv_rmse <- function(f, data, log_outcome = FALSE) {
+  preds <- numeric(nrow(data))
+  for (k in 1:10) {
+    m <- lm(f, data = data[folds != k, ])
+    p <- predict(m, newdata = data[folds == k, ])
+    if (log_outcome) p <- exp(p)  # return predictions to dollars
+    preds[folds == k] <- p
+  }
+  sqrt(mean((data$rent - preds)^2))
+}
+```
+
+Start with a baseline, then add one feature change at a time and record its CV RMSE:
+
+```r
+f0 <- rent ~ income + pct_renter + bldg_age + dist_ch_mi
+cv_rmse(f0, tracts)
+```
+
+# 1. Log transformations
+
+## Why log?
+
+Income and rent can be right-skewed. A few very high values can pull a straight-line fit. A log compresses the upper tail and makes equal **percentage** changes comparable distances. For example, moving from $20,000 to $40,000 may matter more than moving from $180,000 to $200,000, even though both changes are $20,000.
+
+### Log a predictor
+
+```r
+f_logx <- rent ~ log(income) + pct_renter + bldg_age + dist_ch_mi
+m_logx <- lm(f_logx, data = tracts)
+
+b <- coef(m_logx)["log(income)"]
+b / 100             # approximate rent change for a 1% income increase
+b * log(1.10)       # exact model-implied change for a 10% increase
+```
+
+In a **level–log** model (`y ~ log(x)`), a 1% increase in `x` is associated with approximately `β / 100` units of `y`, holding other variables constant.
+
+## Zeros: log1p()
+
+`log(0)` is negative infinity. This causes problems for variables that can be zero, such as counts of crimes, trees, or 311 calls. Use `log1p(x)`, which calculates `log(x + 1)`:
+
+```r
+log1p(c(0, 1, 10, 100))
+```
+
+The percentage interpretation is approximate, especially for small values.
+
+## Log the outcome
+
+```r
+f_logy <- log(rent) ~ log(income) + pct_renter + bldg_age + dist_ch_mi
+m_logy <- lm(f_logy, data = tracts)
+```
+
+In a **log–level** model (`log(y) ~ x`), a one-unit increase in `x` is associated with approximately `100 × β` percent change in `y`. For a larger coefficient, calculate the exact percentage as `(exp(β) - 1) × 100`.
+
+In a **log–log** model (`log(y) ~ log(x)`), `β` is an elasticity: a 1% increase in `x` is associated with approximately a `β`% change in `y`.
+
+| Model form | Approximate coefficient interpretation |
+|---|---|
+| Level–level: `y ~ x` | +1 unit of `x` → `β` units of `y` |
+| Level–log: `y ~ log(x)` | +1% of `x` → `β / 100` units of `y` |
+| Log–level: `log(y) ~ x` | +1 unit of `x` → about `100 × β`% change in `y` |
+| Log–log: `log(y) ~ log(x)` | +1% of `x` → about `β`% change in `y` |
+
+**RMSE trap:** RMSE must be on the same outcome scale to compare models. A residual RMSE from a model of `log(rent)` is in log-dollars; it cannot be compared with the baseline RMSE in dollars. During cross-validation, exponentiate predictions before calculating RMSE. Directly exponentiating a predicted log often estimates closer to the median than the mean, so it can underpredict somewhat; the lecture treats this simple back-transformation as adequate for the assignment.
+
+# 2. Squared terms
+
+If a scatterplot’s smooth curve bends away from a straight line, a linear term may be missing structure. Add a squared term to let the relationship curve:
+
+```r
+f_sq <- rent ~ log(income) + pct_renter + bldg_age +
+  I(bldg_age^2) + dist_ch_mi
+m_sq <- lm(f_sq, data = tracts)
+```
+
+In an R formula, `I()` tells R to perform the arithmetic. Without it, `^` has a special formula meaning.
+
+Do **not** interpret either age coefficient alone. The marginal relationship depends on age. For a quadratic `β₁x + β₂x²`, the turning point is:
+
+```r
+b1 <- coef(m_sq)["bldg_age"]
+b2 <- coef(m_sq)["I(bldg_age^2)"]
+turning_point <- -b1 / (2 * b2)
+range(tracts$bldg_age)
+```
+
+Check that the turning point is inside the observed data range before describing it as a real turn. A parabola can make implausible predictions outside the training range. The lecture also notes that the building-age data pile up at the oldest ages because the Census groups structures built before 1940 as “1939 or earlier”; this is a data limit, not necessarily a real-world pattern.
+
+# 3. Categorical variables
+
+Use a category when a variable is already a group (such as zoning or housing type), or when a numeric relationship appears to change in jumps rather than smoothly. Create groups with `case_when()` when you want explicit rules, or `cut()` when you have breakpoints:
+
+```r
+tracts <- tracts %>%
+  mutate(
+    ring = case_when(
+      dist_ch_mi < 2 ~ "Core",
+      dist_ch_mi < 5 ~ "Inner",
+      TRUE ~ "Outer"
+    ),
+    ring = factor(ring, levels = c("Core", "Inner", "Outer"))
+  )
+```
+
+R encodes a factor with *k* categories as *k − 1* dummy variables. The omitted category is the **reference level** and is included in the intercept. Do not create all *k* dummies by hand.
+
+```r
+f_cat <- rent ~ log(income) + pct_renter + bldg_age +
+  I(bldg_age^2) + ring
+m_cat <- lm(f_cat, data = tracts)
+```
+
+Each category coefficient is a comparison with the reference group, holding the other predictors fixed. If `Core` is the reference, `ringOuter = -120` means outer tracts are predicted to have about $120 lower rent than core tracts with the same values for the other model features. It does **not** mean outer-tract rent is $120.
+
+Changing the reference changes the coefficient comparisons, not the fitted predictions:
+
+```r
+tracts_r <- tracts %>% mutate(ring = relevel(ring, ref = "Outer"))
+```
+
+Binning a continuous predictor discards detail: tracts 2.1 and 4.9 miles from City Hall become the same category in this example. Bins can help when the relationship has genuine jumps, but can hurt when it is smooth. Compare with CV RMSE.
+
+# 4. Interactions
+
+A categorical predictor can shift group lines up or down. An interaction lets the slope vary by group. If income-versus-rent lines are not parallel across distance rings, an interaction may be useful:
+
+```r
+f_int <- rent ~ log(income) * ring + pct_renter +
+  bldg_age + I(bldg_age^2)
+m_int <- lm(f_int, data = tracts)
+```
+
+The `*` expands to the main effects and the interaction (`a * b` gives `a + b + a:b`). With `Core` as the reference, its `log(income)` slope is the main `log(income)` coefficient. The `Outer` slope is the main coefficient plus `log(income):ringOuter`.
+
+Use interactions when there is a substantive reason. Each additional group-specific slope costs more coefficients to estimate from the same limited sample. Avoid crossing every variable with every other variable without a reason.
+
+# 5. Fixed effects
+
+A **fixed effect (FE)** is a categorical predictor for a group, often a place. Place fixed effects can absorb unmeasured attributes that are constant within each place, such as reputation, school catchments, transit access, or history. They tell you **where** adjusted values differ, not **why**.
+
+The lecture assigns Philadelphia tracts to the planning district containing the largest share of each tract’s area (`largest = TRUE`), then fits district as a factor:
+
+```r
+tracts <- tracts %>%
+  st_join(districts %>% select(district = dist_name), largest = TRUE) %>%
+  mutate(district = factor(district))
+
+f_fe <- rent ~ log(income) + pct_renter + bldg_age +
+  I(bldg_age^2) + district
+m_fe <- lm(f_fe, data = tracts)
+```
+
+A district coefficient is a rent difference relative to the reference district, after adjusting for the other predictors. Adding district FE changes the interpretation of the income coefficient: without FE, income is compared across the city; with FE, it is compared among tracts within the same district. Some of the original income association may have reflected districts where many things, including rents, are more expensive.
+
+## Fixed effects and cross-validation
+
+A fixed effect can only predict groups represented in the training data. If a district is absent from a training fold, its coefficient is unavailable and prediction can fail. Count group sizes before cross-validation. The lecture’s rule of thumb is around **10 or more observations per group for 10-fold CV**, with more being safer.
+
+Possible responses to very small groups:
+
+- Merge them with a geographically or substantively sensible neighbor (preferred when defensible).
+- Lump small groups into “Other” for a quick solution, while recognizing the group may combine unrelated places.
+- Use a coarser geography.
+
+The example merges small districts with nearby districts for the CV predictor. It emphasizes that FE is a kind of place memorization and cannot generalize to a never-seen place.
+
+| Fixed effects | Spatial features |
+|---|---|
+| Capture unmeasured differences associated with a group | Represent measured conditions such as proximity to transit, parks, or crime |
+| Cannot predict an unseen group | Can be computed wherever the feature is available |
+| Group boundaries and scale are inherited | Feature scale can be chosen |
+| Tell you where adjusted differences are | Help describe what may explain differences |
+
+They can complement each other: spatial features explain measured conditions, while FE can account for remaining place-level differences.
+
+# Model comparison in the lecture
+
+The slides report approximate CV RMSE values in dollars. Values are rounded, so use them as a record of the lecture’s comparison rather than as exact results to reproduce.
+
+| Model | Feature change | CV RMSE (approx. $) |
+|---|---|---:|
+| m0 | Baseline | 265 |
+| m1 | `log(income)` | 265 |
+| m2 | `log(rent)` and `log(income)`; predictions back-transformed | 263 |
+| m3 | Add `bldg_age^2` | 261 |
+| m4 | Replace distance with distance ring | 265 |
+| m5 | Add `log(income) × ring` | 264 |
+| m6 | Add district FE with small groups merged for CV | 256 |
+
+Some transformations improve prediction, some do not, and some can make it worse. The comparison is meaningful because models use the same rows and folds and RMSE is calculated in dollars.
+
+# Part 5 assignment checklist
+
+The instructor’s guidance for Part 5, recorded here as course instructions:
+
+- Plot first: use a histogram to look for skew and a scatterplot to look for bends.
+- Transform features in response to what the plots show, not at random.
+- Try at least one log, one squared term, and one categorical feature.
+- If modeling a logged outcome, back-transform predictions before calculating RMSE.
+- Count categories before cross-validation, especially for categorical features and fixed effects.
+- Write one sentence interpreting a categorical coefficient and name its reference level.
+- Compare models with the same observations and folds using CV RMSE.
+
+# Quick review
+
+1. Why can a model of `log(rent)` show a smaller RMSE that is not actually better than the baseline?
+2. If `x` has a positive coefficient and `I(x^2)` has a negative coefficient, what shape does the relationship have? What should you check before describing a turn?
+3. With `Core` as the reference and `ringOuter = -120`, complete: “Outer tracts are predicted …”
+4. Why can a fixed-effects model fail to predict for a district absent from its training fold?
+5. Why can the income coefficient change after adding district fixed effects?
+
+# Sources
+
+Organized from the Week 6 feature-engineering slide deck (`week6_recorded_feature_engineering.html`). `Part1.mp4` and `Part2.mp4` are the companion recordings supplied with the deck. The deck identifies this lecture as instruction for Part 5 and a foundation for the next class on k-nearest-neighbor spatial features.
+
