@@ -2,6 +2,7 @@
 title: "Assignment 4: Building Features, Watching What Happens"
 subtitle: "MUSA 5080 · Integrates Weeks 1–5 · Due Friday, October 16"
 author: "Leo Leung"
+date: 2026-10-15
 format:
   html:
     toc: true
