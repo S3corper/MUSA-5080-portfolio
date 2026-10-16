@@ -265,7 +265,4 @@ The instructor’s guidance for Part 5, recorded here as course instructions:
 4. Why can a fixed-effects model fail to predict for a district absent from its training fold?
 5. Why can the income coefficient change after adding district fixed effects?
 
-# Sources
-
-Organized from the Week 6 feature-engineering slide deck (`week6_recorded_feature_engineering.html`). `Part1.mp4` and `Part2.mp4` are the companion recordings supplied with the deck. The deck identifies this lecture as instruction for Part 5 and a foundation for the next class on k-nearest-neighbor spatial features.
 
