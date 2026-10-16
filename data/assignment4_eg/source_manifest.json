@@ -1,0 +1,23 @@
+﻿[
+    {
+        "file":  "acs_2023.rds",
+        "source":  "2023 ACS five-year estimates and tract geometry via tidycensus",
+        "filter":  "state=PA; county=Philadelphia; geography=tract",
+        "cached_at_utc":  "2026-10-15T22:25:36.1096153Z",
+        "sha256":  "F40719AF9CF22302A0984F2950381866DEDE6A52B02B45CA96B2A5564A069234"
+    },
+    {
+        "file":  "burglary_2023.rds",
+        "source":  "https://phl.carto.com/api/v2/sql",
+        "filter":  "incidents_part1_part2; 2023 dispatch_date; Burglary Residential",
+        "cached_at_utc":  "2026-10-15T22:25:36.7069398Z",
+        "sha256":  "47A0FDD73C44DD54C49A439EED4565FB52021B75892CB93C29A8FFD060011926"
+    },
+    {
+        "file":  "shooting_victims_2023.rds",
+        "source":  "https://phl.carto.com/api/v2/sql",
+        "filter":  "shootings; 2023 date_; records represent victims",
+        "cached_at_utc":  "2026-10-15T22:25:37.0334155Z",
+        "sha256":  "02DB0EE8282657D108374F059E2C837189C2E887DD932E33CBDEDA1F950A186A"
+    }
+]

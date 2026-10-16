@@ -1,0 +1,12 @@
+model,added,compared_to,cv_rmse,improvement,notes
+m1,ACS baseline,NA,5.143758521814487,NA,Four untransformed ACS predictors
+m2,Burglary count,m1,5.1473841516035375,-0.0036256297890506772,
+m3,Burglary density,m1,5.149247403352551,-0.005488881538064483,Alternative to raw count
+m4,Shooting-victim density,m1,5.155375077081466,-0.011616555266979134,
+m5,Distance to nearest shooting-victim location,m1,5.147362172287142,-0.0036036504726553176,
+m6,Distance to City Hall,m1,5.116141948819964,0.027616572994523025,
+m7,Log1p burglary density,m3,5.155706321720799,-0.006458918368247524,Replace raw density with log1p
+m8,Squared City Hall distance,m6,4.994486971981756,0.12165497683820803,Retain linear and squared distance
+m9,City Hall distance categories,m6,5.021691877493031,0.09445007132693295,Replace linear distance; Core is the reference
+combine4,Add Squared City Hall distance,m1,4.994486971981756,0.14927154983273105,Retain only if CV RMSE decreases
+final,Selected m8,m1,4.994486971981756,0.14927154983273105,Reuse selected candidate's score; no independent test set
