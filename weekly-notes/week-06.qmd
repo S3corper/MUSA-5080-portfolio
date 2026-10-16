@@ -1,5 +1,5 @@
 ---
-title: "Week 6 Notes: Feature Engineering"
+title: "Week 6: Feature Engineering"
 subtitle: "Transformations, categories, interactions, and fixed effects"
 author: "MUSA 5080"
 date: 2026-10-09
