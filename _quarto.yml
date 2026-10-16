@@ -23,7 +23,8 @@ website:
 
 format:
   html:
-    theme: darkly
+    theme: darkly
+    css: styles.css
     toc: true
     code-fold: false
     code-tools: true
@@ -33,3 +34,4 @@ execute:
   echo: true
   warning: false
   message: false
+

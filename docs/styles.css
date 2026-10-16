@@ -1,0 +1,13 @@
+/* Keep the reading outline compact on every page that has a table of contents. */
+#TOC,
+#TOC a {
+  font-size: 0.7rem;
+}
+
+#TOC > h2 {
+  font-size: 0.8rem;
+}
+
+#TOC ul {
+  line-height: 1.1;
+}

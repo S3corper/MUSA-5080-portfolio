@@ -1,0 +1,612 @@
+---
+title: "Week 5: Regression, Prediction, and Cross-Validation"
+description: "Using income to model rent, interpret residuals, and evaluate predictions on unseen data."
+date: 2026-09-25
+format:
+  html:
+    toc: true
+    code-fold: false
+execute:
+  echo: true
+  eval: true
+  message: false
+---
+
+## What We Studied
+
+This week focused on a question: **Where are rents higher than we would expect given household income?** We used regression to describe the relationship between income and rent, then considered how to check whether a model predicts well beyond the data used to fit it.
+
+The main topics were linear regression, inference versus prediction, least squares, residuals, measurement error, training and test data, cross-validation, overfitting, and multicollinearity.
+
+::: {.callout-note}
+## About these notes and examples
+
+I used made-up data for the examples so I can run them without the lab files. The lecture transcript did not include the full lab code. The example numbers below are for practice, not results from the lab.
+:::
+
+## Starting with the Question
+
+Suppose we observe the following illustrative values:
+
+| Annual household income | Monthly rent |
+|---:|---:|
+| $30,000 | $1,000 |
+| $100,000 | $3,000 |
+| $250,000 | $6,000 |
+
+These numbers suggest a positive relationship: places with higher incomes may also have higher rents. A model estimates that relationship across many observations. It does not assume every place with the same income has exactly the same rent.
+
+For a tract-level analysis:
+
+- **Outcome, response, or Y:** median monthly rent.
+- **Predictor, explanatory variable, or X:** median annual household income.
+- **Observation:** one census tract.
+
+Income and rent must refer to compatible geographies and periods. Annual income and monthly rent have different time units; that is acceptable in regression, but the labels and coefficient interpretation must make those units clear.
+
+## The General Model: Y = f(X) + Epsilon
+
+$$
+Y = f(X) + \varepsilon
+$$
+
+| Symbol | Meaning in the rent example |
+|---|---|
+| $Y$ | The observed rent |
+| $X$ | The income information supplied to the model |
+| $f(X)$ | The systematic relationship between income and rent |
+| $\varepsilon$ | Variation not explained by that relationship |
+
+The symbol $\varepsilon$ is called **epsilon**. A model using only income cannot account for everything affecting rent: housing quality, location, amenities, local supply, and other differences may matter.
+
+If $f(X)$ represents the true conditional mean, epsilon has mean zero conditional on X. Our fitted model may still miss systematic patterns because we chose an incomplete functional form or omitted useful predictors.
+
+**An error term and a residual are related but different:** epsilon belongs to the underlying statistical model; a residual is a difference we calculate after fitting a model to observations.
+
+## Linear Regression
+
+A simple linear regression takes the form:
+
+$$
+Y_i = \beta_0 + \beta_1 X_i + \varepsilon_i
+$$
+
+- $\beta_0$ is the **intercept**: the model's expected Y when X equals zero.
+- $\beta_1$ is the **slope**: the expected difference in Y associated with a one-unit increase in X.
+- $i$ identifies an observation.
+
+The fitted prediction is:
+
+$$
+\hat{Y}_i = \hat{\beta}_0 + \hat{\beta}_1 X_i
+$$
+
+A hat indicates an estimated quantity. We do not add an observed epsilon to make a prediction because that unexplained component is unknown.
+
+For example, suppose an illustrative fitted model is:
+
+$$
+\widehat{\text{monthly rent}} = 500 + 0.02 \times \text{annual income}
+$$
+
+At an annual income of $50,000, predicted monthly rent is $1,500. The slope of 0.02 means an additional $1,000 in annual income is associated with $20 more in predicted monthly rent.
+
+This is an association. It does not establish that raising a household's income causes its rent to rise. A tract-level relationship also does not establish the same relationship for individual households.
+
+The intercept may have little substantive meaning when zero income is far outside the observed data.
+
+### Checking Units in the Lecture Example
+
+The transcript refers to an illustrative intercept of about 690 and a slope of 0.0081. If income is recorded in dollars, that would give:
+
+$$
+\widehat{\text{monthly rent}} = 690 + 0.0081 \times \text{annual income}
+$$
+
+An additional $10,000 of annual income would correspond to $81 more in predicted monthly rent: $0.0081 \times 10{,}000 = 81$.
+
+If we instead create an income column measured in units of $10,000, the equivalent slope becomes 81. The relationship and fitted predictions are unchanged; only the coefficient's units change. These lecture numbers are illustrations, not the output of the practice model below.
+
+## Inference and Prediction
+
+| Goal | Question | Main focus |
+|---|---|---|
+| Inference | How is income associated with rent? | Coefficients, uncertainty, assumptions |
+| Prediction | What rent should the model predict for another tract? | Accuracy on observations not used to fit the model |
+
+The note “B1 is inference” is shorthand. **Beta 1 is a coefficient; inference is the process of learning about relationships and their uncertainty.** Prediction uses estimated relationships to calculate outcomes.
+
+A model can have a statistically significant slope and still make poor predictions. Likewise, a model may predict reasonably well while its individual coefficients are difficult to interpret.
+
+### The Main Emphasis of This Class
+
+The professor contrasted this course's emphasis on **prediction** with the emphasis on **inference** in our statistics course. We begin with linear regression because its mechanics are relatively easy to inspect. The same process of training, validation, and comparing errors can later be applied to other models.
+
+A predictor does not have to pass an individual coefficient significance test to be useful for prediction. The question is whether it improves performance on appropriately held-out observations. However, trying many variables and repeatedly selecting the best validation result can itself overfit the validation data.
+
+### Variables, Features, and Targets
+
+In this context, a **feature** is an input used for prediction. It may be an original column, such as income, or something derived from other data, such as distance to a university. The **target** is the outcome to predict, here rent. Not every column should be treated as a predictor: a tract identifier is usually for joining and labeling, for example.
+
+Predicting a continuous amount such as monthly rent is a **regression problem**. Predicting a category such as whether a property is vacant is a **classification problem**. Logistic regression can serve the latter purpose despite having “regression” in its name.
+
+### The Bike-Share Example: Useful Prediction Is Not Causation
+
+The professor used bike-share stations as an example of a possible predictor of rent. Their presence might reflect accessibility, destinations, investment, or other neighborhood characteristics. A station variable could act as a **proxy**, capturing information about those characteristics indirectly.
+
+Even if adding station information improves predictions, we cannot conclude that installing a station would cause rents to increase. Stations may have been placed where those conditions already existed. Statistical significance would not resolve that causal question either.
+
+**Endogeneity** refers to a predictor being correlated with the model's error term, potentially because of omitted influences, reverse causation, or other mechanisms. It is different from multicollinearity, which concerns relationships among predictors. A useful prediction model alone is not sufficient evidence for a policy intervention.
+
+## Model Flexibility
+
+More flexible models can represent more complicated relationships, but they can also follow accidental patterns in a particular sample.
+
+| Model family | Useful context |
+|---|---|
+| Linear regression | A relatively simple relationship, with directly interpretable coefficients |
+| Ridge and lasso | Penalized regression that shrinks coefficients; lasso can set some to zero |
+| Logistic regression | Usually used to model probabilities for a categorical outcome, such as yes/no |
+| Decision trees | Divide the predictor space into regions using rules |
+| Random forests | Combine many randomized trees |
+| Boosting | Builds models sequentially to improve an overall prediction |
+| Neural networks | Can learn complex relationships, depending on their architecture and training |
+
+This is **not a fixed ranking from worst to best or rigid to flexible**. Tree depth, penalties, network size, and other settings affect flexibility. Logistic regression is not simply the next step after linear regression for predicting continuous rent.
+
+**Parametric models** specify a functional form with a fixed set of parameters, such as an intercept and slope. **Nonparametric models** do not restrict the relationship to that fixed form. Nonparametric does not mean “no assumptions” or “no quantities to estimate.”
+
+## How Least Squares Chooses the Line
+
+For each observation:
+
+$$
+e_i = y_i - \hat{y}_i
+$$
+
+Ordinary least squares chooses coefficients that minimize:
+
+$$
+\sum_{i=1}^{n}(y_i - \hat{y}_i)^2
+$$
+
+These are **vertical differences in the outcome**, not the shortest perpendicular distances to the line. Squaring prevents positive and negative residuals from canceling and gives large errors more influence.
+
+If two residuals are +$200 and -$200, their sum is zero, but their squared errors sum to 80,000 dollars squared. The fit should not treat those two errors as no error.
+
+## A Practice Dataset That Runs on Its Own
+
+The following code creates 100 fictional tracts. The random variation represents differences the simple income model cannot explain.
+
+```{r}
+#| label: make-practice-data
+
+set.seed(5080)
+
+practice_tracts <- data.frame(
+  tract_id = sprintf("Practice %03d", 1:100),
+  med_inc = seq(30000, 150000, length.out = 100)
+)
+
+practice_tracts$med_rent <-
+  600 + 0.015 * practice_tracts$med_inc + rnorm(100, mean = 0, sd = 180)
+
+head(practice_tracts)
+```
+
+`set.seed()` makes this random example reproducible. `rnorm()` generates the simulated variation. Changing the seed changes that variation, not the meaning of the code.
+
+## Fitting the Model in R
+
+```{r}
+#| label: fit-practice-model
+
+m1 <- lm(med_rent ~ med_inc, data = practice_tracts)
+summary(m1)
+```
+
+Read `med_rent ~ med_inc` as “model rent as a function of income.” `data` identifies the table containing those columns, and `m1` stores the fitted model.
+
+R is case-sensitive: use **`summary(m1)`**, not `Summary(m1)`. The `lm()` and `summary()` functions are available with a standard R installation.
+
+The corresponding class example would be:
+
+```r
+m1 <- lm(med_rent ~ med_inc, data = tracts)
+summary(m1)
+```
+
+That last block is displayed for reference rather than executed because the real `tracts` object is not supplied in these notes.
+
+## Seeing the Fitted Line
+
+```{r}
+#| label: fig-income-rent
+#| fig-cap: "Invented practice data: monthly rent and annual household income."
+#| fig-width: 8
+#| fig-height: 5
+
+plot(
+  practice_tracts$med_inc,
+  practice_tracts$med_rent,
+  pch = 19,
+  col = "steelblue",
+  xlab = "Median annual household income ($)",
+  ylab = "Median monthly rent ($)",
+  main = "A linear model of rent and income"
+)
+abline(m1, col = "darkorange", lwd = 2)
+```
+
+Each point represents a fictional tract. The line gives the fitted rent at each income. Points above the line have positive residuals; points below it have negative residuals.
+
+## Reading summary(m1)
+
+| Output | How to read it |
+|---|---|
+| Estimate | The fitted coefficient |
+| Std. Error | Estimated uncertainty in that coefficient |
+| t value and Pr(>\|t\|) | A test of whether a coefficient is zero, under the model assumptions |
+| Residual standard error | Residual variation, expressed in the outcome's units |
+| Multiple R-squared | The proportion of outcome variation explained in the fitting sample |
+| Adjusted R-squared | An R-squared measure adjusted for the number of predictors |
+
+A small p-value does not tell me the relationship is causal or that the model will predict well elsewhere. Standard errors and tests depend on assumptions about the errors, including their dependence and variance.
+
+For a test of a zero coefficient, the t statistic is the estimated coefficient divided by its standard error. The p-value concerns results at least as extreme under that null hypothesis and the test assumptions. It is not the probability that the null hypothesis is true. A zero slope means no linear association in the specified model; a nonlinear relationship could still exist.
+
+## Where Do Rents Exceed Expectations?
+
+We calculate fitted rents and subtract them from observed rents:
+
+```{r}
+#| label: calculate-practice-residuals
+
+practice_tracts$predicted_rent <- predict(m1, newdata = practice_tracts)
+practice_tracts$residual <-
+  practice_tracts$med_rent - practice_tracts$predicted_rent
+
+head(practice_tracts)
+```
+
+| Observed monthly rent | Predicted monthly rent | Residual | Interpretation |
+|---:|---:|---:|---|
+| $1,800 | $1,500 | +$300 | Higher than the model predicts |
+| $1,200 | $1,500 | -$300 | Lower than the model predicts |
+| $1,500 | $1,500 | $0 | Equal to the fitted prediction |
+
+“Expected” means **expected under this particular model and its predictors**. A positive residual does not automatically prove overcharging, unfairness, or unaffordability. It may reflect omitted housing characteristics, sampling error, or a poorly specified model.
+
+```{r}
+#| label: largest-positive-practice-residuals
+
+highest_residuals <- practice_tracts[
+  order(practice_tracts$residual, decreasing = TRUE),
+]
+
+head(highest_residuals, 10)
+```
+
+`order()` supplies a row ordering. Here, the table is sorted from the largest positive residual downward.
+
+A residual map would join these results back to tract geometry by a unique GEOID. Geographic clusters could suggest omitted spatial influences, but the map alone would not identify their cause.
+
+## Residuals Are Useful for Checking the Model
+
+```{r}
+#| label: fig-residual-check
+#| fig-cap: "Practice residuals versus fitted rents."
+#| fig-width: 8
+#| fig-height: 5
+
+plot(
+  fitted(m1), residuals(m1),
+  pch = 19, col = "steelblue",
+  xlab = "Fitted monthly rent ($)",
+  ylab = "Observed minus fitted rent ($)",
+  main = "Checking the residual pattern"
+)
+abline(h = 0, lty = 2)
+```
+
+A curved pattern can suggest missing nonlinearity. A widening spread can suggest changing error variance. An unusually large residual deserves investigation, but is not a reason to automatically delete an observation.
+
+These checks complement predictive evaluation. A good-looking residual plot by itself is not proof of good performance on unseen data.
+
+### Homoskedasticity and Heteroskedasticity
+
+**Homoskedasticity** means the conditional error variance is constant. **Heteroskedasticity** means it varies. For example, rent prediction errors might be much more spread out in high-income tracts than in middle-income tracts.
+
+The professor emphasized that this pattern is useful information: our predictions may be less precise for some kinds of places. It is a reason to investigate those errors, consider useful predictors or a different functional form, and evaluate performance across groups.
+
+A widening spread does not, by itself, prove an omitted variable or a biased conditional mean. Some outcomes are simply more variable in certain groups. Constant variance also does not mean residuals are independent, normally distributed, or free of systematic mean patterns; those are separate considerations.
+
+For inference, heteroskedasticity-robust standard errors can change uncertainty estimates without changing the ordinary least-squares fitted line. They do not automatically improve its predictions. For prediction, adding features may help if there is learnable structure, but cannot guarantee constant error variance.
+
+### Outliers, Leverage, and Influence
+
+A large residual means an observation's outcome differs substantially from its prediction. **High leverage** means an observation has an unusual predictor value or combination of values. An **influential observation** materially changes the fitted model when removed. These are related ideas, but not synonyms. Investigate unusual points before deciding how to handle them.
+
+## Measurement Error: Noise in Y and Noise in X
+
+ACS income and rent are estimates, so both can contain sampling error.
+
+**Noise in Y:** independent, mean-zero measurement error in rent generally increases residual variation and reduces precision without systematically biasing the slope under the standard simple linear model assumptions.
+
+**Noise in X:** in simple regression with classical additive, independent measurement error in income, the estimated slope is biased toward zero. This is called **attenuation bias**. A positive slope becomes flatter on average.
+
+The qualification matters. Systematic or correlated errors, and models with several noisy predictors, can behave differently. It is not a universal rule that every kind of noise in X flattens every coefficient.
+
+Ordinary `lm()` does not automatically incorporate ACS margins of error or correct predictor measurement error. Residuals can combine survey uncertainty with real differences and model misspecification.
+
+## Fit Versus Prediction
+
+A model's fit describes how well it represents the observations used to estimate it. Prediction asks how well it performs on observations it has not already seen.
+
+The R-squared printed by `summary(m1)` describes **in-sample fit**. An R-squared of 0.80 means the fitted model explains 80% of the observed variation in Y around its mean in that sample. It does not mean 80% of predictions are correct.
+
+For ordinary least squares with an intercept, adding predictors cannot lower training R-squared when the fitting observations remain the same. That makes training R-squared an insufficient basis for choosing a model.
+
+An out-of-sample R-squared can also be calculated, but it is not the value automatically printed in the ordinary model summary. Unlike conventional training R-squared, out-of-sample R-squared can be negative.
+
+## Training and Test Data
+
+Think of training data as practice questions and test data as new exam questions. Checking performance only on the practice questions can reward memorization.
+
+We first reserve 20% of the fictional tracts as a test set. These rows should not guide model selection.
+
+```{r}
+#| label: split-practice-data
+
+set.seed(25)
+
+train_rows <- sample(
+  seq_len(nrow(practice_tracts)),
+  size = floor(0.8 * nrow(practice_tracts))
+)
+
+train_data <- practice_tracts[train_rows, c("tract_id", "med_inc", "med_rent")]
+test_data <- practice_tracts[-train_rows, c("tract_id", "med_inc", "med_rent")]
+
+c(training_rows = nrow(train_data), test_rows = nrow(test_data))
+```
+
+The earlier full-data model was a demonstration of fitting and residuals. **We do not reuse its fitted coefficients or predictions to evaluate this split.** The following evaluation fits fresh models using training rows only.
+
+## Cross-Validation
+
+Here **CV means cross-validation**. In our earlier ACS work, CV meant **coefficient of variation**. Context determines which meaning applies.
+
+In K-fold cross-validation:
+
+1. Divide the training observations into K groups called folds.
+2. Hold out one fold for validation.
+3. Fit a model on the other K minus one folds.
+4. Predict the held-out observations and record their errors.
+5. Repeat until each fold has been held out once.
+6. Summarize the validation errors.
+
+For 100 observations and five equal folds, each round fits on 80 observations and validates on 20. Every observation is used for validation once. For ten equal folds, each round fits on 90% and validates on 10% of the data assigned to cross-validation.
+
+The separate test set stays outside this process. If I repeatedly inspect test results to choose a model, that set has become part of model selection.
+
+## Error Metrics: MAE and RMSE
+
+$$
+\text{MAE} = \frac{1}{n}\sum_{i=1}^{n}|y_i - \hat y_i|
+$$
+
+$$
+\text{RMSE} = \sqrt{\frac{1}{n}\sum_{i=1}^{n}(y_i - \hat y_i)^2}
+$$
+
+Both metrics are in the outcome's units, here dollars of monthly rent. Lower values mean smaller errors on the **same evaluation data and outcome scale**. RMSE gives greater influence to large errors. Neither guarantees that every prediction lies within that many dollars of the truth.
+
+The lecture used being “off by about $300” to make RMSE understandable to a nontechnical audience. More precisely, an RMSE of $300 is a root-mean-squared error of $300; the mean absolute error need not be $300.
+
+For errors of $100 and $300, MAE is $200, while RMSE is about $223.61. The larger error gets more weight in RMSE.
+
+A **loss function** scores prediction errors. Ordinary least squares minimizes squared errors on the fitting data. A validation metric scores performance on held-out data. They can use related formulas, but the observations being scored are different.
+
+## A Ten-Fold Practice Example
+
+This example performs ten-fold validation **within the 80-row training set**. Each fold contains eight rows; each fitted model uses the other 72.
+
+```{r}
+#| label: ten-fold-practice
+
+set.seed(5080)
+
+fold_id <- sample(rep(1:10, length.out = nrow(train_data)))
+cv_predictions <- rep(NA_real_, nrow(train_data))
+fold_rmse <- numeric(10)
+
+for (k in 1:10) {
+  fitting_rows <- train_data[fold_id != k, ]
+  validation_rows <- train_data[fold_id == k, ]
+
+  fold_model <- lm(med_rent ~ med_inc, data = fitting_rows)
+
+  cv_predictions[fold_id == k] <- predict(
+    fold_model,
+    newdata = validation_rows
+  )
+
+  fold_errors <- validation_rows$med_rent - cv_predictions[fold_id == k]
+  fold_rmse[k] <- sqrt(mean(fold_errors^2))
+}
+
+cv_errors <- train_data$med_rent - cv_predictions
+
+data.frame(
+  metric = c("Pooled validation MAE", "Pooled validation RMSE",
+             "Mean fold RMSE"),
+  dollars = c(mean(abs(cv_errors)), sqrt(mean(cv_errors^2)),
+              mean(fold_rmse))
+)
+
+data.frame(fold = 1:10, RMSE = fold_rmse)
+```
+
+How to read the loop:
+
+- `k` identifies the fold currently being held out.
+- `!= k` selects all the other folds for fitting.
+- `== k` selects the validation fold.
+- `cv_predictions[fold_id == k]` stores predictions in the positions belonging to that fold.
+
+Each prediction comes from a model that did not fit on that observation. We combine all held-out errors to calculate the displayed metrics.
+
+The transcript describes averaging the fold RMSEs. The code now reports that value as well as **pooled RMSE**, calculated from all held-out squared errors together. These are not generally equal because taking a square root and averaging are different operations. Use the same definition when comparing models, and inspect the fold results to see whether performance varies substantially between splits.
+
+If comparing several models, use the same folds for each. Preprocessing that learns from data, such as imputation or scaling, must also be fitted inside each training fold. Otherwise validation information can leak into training.
+
+## Final Test-Set Evaluation
+
+After selecting a model specification using training data, fit that specification to the full training set and evaluate once on the reserved test set. Here we demonstrate one linear specification, without a model-selection contest.
+
+```{r}
+#| label: evaluate-practice-test-set
+
+train_model <- lm(med_rent ~ med_inc, data = train_data)
+test_predictions <- predict(train_model, newdata = test_data)
+test_errors <- test_data$med_rent - test_predictions
+
+# A simple benchmark: predict the training mean rent for every test tract.
+baseline_predictions <- rep(mean(train_data$med_rent), nrow(test_data))
+baseline_errors <- test_data$med_rent - baseline_predictions
+
+data.frame(
+  model = c("Income model", "Training-mean benchmark"),
+  test_MAE = c(mean(abs(test_errors)), mean(abs(baseline_errors))),
+  test_RMSE = c(
+    sqrt(mean(test_errors^2)),
+    sqrt(mean(baseline_errors^2))
+  )
+)
+```
+
+The benchmark asks whether income improves prediction over simply using an average. Compare errors rather than assuming a fitted regression must be useful.
+
+### Which Regression Line Do We Keep After Cross-Validation?
+
+This question came up in class. Each validation fold produces its own fitted line because it uses a different training subset. We normally **do not choose the line from the fold with the smallest error**. The folds help evaluate and choose a model specification, such as which predictors or penalty to use.
+
+We then fit that chosen specification again using all the training data. If a separate test set was reserved, it remains untouched until final evaluation, as shown above.
+
+After that evaluation, a model intended for use may be refitted on all available development observations, potentially including the former test set. If we do that, those rows no longer provide an independent test of the refitted model. We should retain and clearly report the earlier evaluation rather than present the new full-data fit as fresh evidence of predictive performance.
+
+## Overfitting and Underfitting
+
+**Overfitting** occurs when a model learns sample-specific patterns, including noise, that do not generalize well. Training error can be very low while validation error is much larger.
+
+**Underfitting** occurs when the model is too restrictive to capture useful structure. A straight line may miss a strongly curved relationship.
+
+Increasing flexibility can reduce underfitting but increase sensitivity to the particular training sample. Validation helps choose an appropriate level of complexity. More complex does not automatically mean better, and a simple model can also perform poorly.
+
+**LOOCV**, or leave-one-out cross-validation, is the case where K equals the number of observations. Each round holds out one observation. Ten-fold CV requires fewer fits and is often a practical alternative; LOOCV is not automatically superior.
+
+## A Spatial Caution
+
+Nearby tracts may share housing markets and other influences. Randomly splitting them can place very similar neighbors in training and validation sets, making evaluation optimistic for the task of predicting an entirely new area.
+
+If the intended use is prediction in new regions, spatially separated folds may better represent that task. If predicting a future year, a time-based split may be more appropriate. The validation design should resemble the situation in which the model will be used.
+
+The random splits above are appropriate for demonstrating the mechanics with independent invented observations; they do not establish that random CV is the best design for the real tract dataset.
+
+## Multicollinearity
+
+The transcript gives important context to the rough note “mostly harmless.” The professor was discussing **prediction**, where a model may still be useful despite correlated predictors, provided validation supports it. That was not a claim that multicollinearity has no consequences.
+
+Multicollinearity means one predictor can be closely approximated by a combination of other predictors. For example, median income and a strongly related income measure may contain overlapping information.
+
+It can make individual coefficient estimates unstable and inflate their standard errors. With exact linear dependence, some coefficients cannot be uniquely estimated. It is therefore too broad to say it is “mostly harmless.”
+
+For prediction within the same range and predictor relationships, the combined prediction can sometimes remain useful even when individual coefficients are unstable. Predictions may become unreliable when those relationships change or when extrapolating. Ridge regression is one possible response, chosen and evaluated according to the task.
+
+In the one-predictor income model there are no multiple predictors to compete with one another. This issue becomes relevant as we add predictors.
+
+## Connecting Back to the Rent Question
+
+### Using Residuals to Create Better Features
+
+The professor's university example helps explain the original rent question: a neighborhood may have relatively low measured household income but high rents because students want to live near campus. Income alone may miss the influence of that location.
+
+**Feature engineering** means constructing useful model inputs from available information. We might notice a pattern in training residuals and then test a feature that could capture it.
+
+| Pattern or idea | Possible feature | Question to test |
+|---|---|---|
+| Rent is underpredicted near universities | Distance to the nearest campus | Does adding distance reduce validation error? |
+| Campus influence may be concentrated nearby | Indicator for being within a chosen campus buffer | Does this threshold work better than continuous distance? |
+| Errors differ in very high-income areas | High-income indicator or nonlinear income term | Does it improve predictions for held-out observations? |
+| Access or amenities may matter | Nearby station count or distance to a station | Does this information improve prediction beyond income? |
+
+The transcript mentions flagging the highest-income neighborhoods with a binary variable. **Binary means 0 or 1**: for example, 1 for an observation meeting a stated income rule and 0 otherwise. This is a hypothesis to test, not a guaranteed fix.
+
+It is more useful to define a reproducible rule based on available predictors than to mark a handful of tract IDs just because the model missed them. An ID-specific fix can memorize the training sample and fail elsewhere.
+
+If a threshold is estimated from the data, such as the top income percentile, estimate it from each training fold and apply that rule to its validation fold. Do not use validation rents to create predictor values. Features must also be available when making the intended future prediction.
+
+### Connecting Feature Engineering to Week 4
+
+Our spatial tools can help construct these features:
+
+- `st_distance()` supplies distances that can be reduced to the nearest relevant feature.
+- `st_buffer()` creates a proximity zone, with a suitable CRS and distance units.
+- `st_intersects()` identifies which geometries meet that zone.
+- `st_join()` attaches attributes using a specified spatial relationship.
+
+The precise definition matters. The distance from an entire tract polygon to a campus can be zero if they intersect. Distance from a tract centroid is a different measure. Similarly, “any part of the tract intersects a half-mile buffer” does not mean every resident lives within half a mile.
+
+These are modeling choices that should be documented and evaluated, not interchangeable ways to describe proximity.
+
+### Comparing Candidate Features Fairly
+
+Start with the income-only baseline. Evaluate a candidate model with the same folds and metric, compare its errors with the baseline, and inspect where it improves or worsens predictions. A tiny improvement on one split can be chance variation; there is no universal RMSE cutoff that defines a good model.
+
+Use training and validation results to make these choices. Keep the final test set for the final assessment. A nonsignificant coefficient is not an automatic reason to remove a useful predictor, and a significant coefficient is not an automatic reason to keep a poor predictor.
+
+### Philadelphia Versus Miami
+
+The class discussed whether a rent model built for Philadelphia would work in Miami. This is a question about **generalization**: will the learned relationship remain useful in the intended setting?
+
+Miami may have different predictor distributions and rent relationships, including the relevance of beach proximity. Poor transfer can result from **distribution shift**, even if the model was not overfit within Philadelphia. Strong local validation does not guarantee accuracy in another city.
+
+A model intended for one city can use locally meaningful features. A model intended for multiple cities needs consistently defined, available inputs and evaluation that represents those new cities. The desired use determines what kind of validation is convincing.
+
+### A Practical Workflow
+
+To study rents above the model's expectation, I would:
+
+1. Define the geography, period, rent measure, and income measure.
+2. Check missing values, ACS reliability, and whether variables describe compatible populations.
+3. Plot income against rent and fit a baseline model.
+4. Examine coefficients and residual patterns.
+5. Evaluate prediction with a suitable validation design.
+6. Calculate and map residuals, stating whether they are fitted or held-out prediction errors.
+7. Investigate places with large positive residuals without treating those residuals as proof of a cause.
+
+For the real lab, I should retain the professor's supplied workflow and adapt the variable names and data preparation to that file. The practice examples here explain the mechanics but do not replace the lab dataset or instructions.
+
+## Corrections to Remember
+
+| Rough note | More precise version |
+|---|---|
+| “B1 is inference” | Beta 1 is a slope parameter; inference concerns relationships and uncertainty. |
+| “Noise in X flattens the slope” | This holds under classical measurement-error assumptions in simple regression. |
+| “R-squared tells us prediction quality” | The usual model summary reports training fit; evaluate unseen-data predictions separately. |
+| “Multicollinearity is mostly harmless” | It can undermine coefficient interpretation and sometimes prediction. |
+| “CV” always means the same thing | Here it means cross-validation; previously it meant coefficient of variation. |
+| “Positive residual means overpriced” | It means higher than this model predicts, which requires further interpretation. |
+
+## Further Reading
+
+The lecture-specific examples and emphasis above come from the supplied September 25, 2026 class transcript. The sources below provide further explanation and technical reference. The transcript is imperfect, so it is not used as a verbatim quotation or a verified record of the lab's numerical results.
+
+- [An Introduction to Statistical Learning](https://www.statlearning.com/): Chapters 2, 3, 5, and 6 cover statistical learning, regression, resampling, and regularization.
+- [R documentation: lm()](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/lm.html).
+- [R documentation: summary.lm()](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/summary.lm.html).
+- [R documentation: predict.lm()](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/predict.lm.html).
+- [Penn State STAT 501: Multicollinearity and other regression pitfalls](https://online.stat.psu.edu/stat501/Lesson12).
+- [Measurement error and attenuation: hdme package vignette](https://www.stat.ethz.ch/CRAN/web/packages/hdme/vignettes/hdme.html).
+

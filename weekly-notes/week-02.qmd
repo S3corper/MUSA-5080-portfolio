@@ -1,65 +1,305 @@
 ---
-title: "Week 2: dplyr and Census"
-description: "Table functions and acs data."
+title: "Week 2: Tibbles, dplyr, and Census Data"
+description: "Quick revision notes on R tables and Census estimates."
 date: 2026-09-04
+format:
+  html:
+    toc-expand: true
 ---
 
-## What We Did
+## This Week in One Picture
 
-<!-- CHANGE THIS: replace with your own notes -->
+```text
+R table → choose rows → choose columns → make new columns → sort or summarize
+                       dplyr verbs
+```
 
-First, we had a quiz. Then
+- We practiced using R to work with tables.
+- We also learned how Census data describes people, places, and uncertainty.
 
-## Key Concepts
+## R Basics
 
-*Object, verbs, census*
-Console - Code disappears
+### Where does code go?
 
-.R script
+- **Console** → try a quick command; it is not saved as a note.
+- **R script (`.R`)** → save code so you can use it again.
+- **Quarto (`.qmd`)** → put words, code, tables, and pictures together.
+- **Code chunk** → a box of R code inside a Quarto note.
 
-Code chunk lives inside .qmd
+### How to read a line of code
 
-result <- filter(counties, population > 50000) #keep the big ones
+```r
+result <- filter(counties, population > 50000)
+```
 
-result = object that holds the result 
+- `result` → the name of the new object (a place to keep the answer).
+- `<-` → “put the answer into.” `=` can also assign a value.
+- `filter()` → the function (the action).
+- `counties` → the table to work on.
+- `population > 50000` → the rule for keeping rows.
+- R cares about capital letters: `Name`, `name`, and `NAME` are different.
 
-<-: Assignment Arrow (or =)
+### Packages: tools for R
 
-filter: Function Name (verb)
+- A **package** adds extra tools to R.
+- Install a package once; load it each time you start a new R session.
 
-Counties: Input data
+```r
+# Do this once, if dplyr is not installed:
+# install.packages("dplyr")
 
-population > 50000: Arguments
+# Do this in a session when you need dplyr:
+library(dplyr)
+```
 
-*Packages*
+### Tables: data frames and tibbles
 
-Install.packages("dplyr") -> do once 
+- A table has **rows** and **columns**.
+- A row is one thing being described, such as one county.
+- A column is one fact about it, such as its name or income.
+- A **data frame** is an R table.
+- A **tibble** is a data frame that prints in a tidier way.
 
-library(dplyr) -> took the book off the shelf, everytime you want to use it
+| Name | Income | MOE |
+|:--|--:|--:|
+| Adams | 78,975 | 3,334 |
+| Berks | 74,617 | 1,191 |
+| Bucks | 104,200 | 1,502 |
 
-library(tidycensus) 
+## dplyr: Actions for Tables
 
+Think of each verb as a small instruction for a table:
 
+- `filter()` → keep certain **rows**.
+  - Example: `filter(counties, moe_pct > 10)`
+- `select()` → keep certain **columns**.
+  - Example: `select(counties, Name, moe_pct)`
+- `mutate()` → add or change a **column**.
+  - Example: `mutate(counties, income_thousands = Income / 1000)`
+- `arrange()` → put rows in a new **order**.
+  - Example: `arrange(counties, desc(moe_pct))` sorts biggest to smallest.
+- `group_by()` → make piles of rows with the same label.
+- `summarize()` → make one short answer for each pile.
 
-# Keep the big ones!: Comment (code description)
+### Example: smallest income in each state
 
-The loop: **Edit → Save → Render → Commit → Push → wait → refresh**
+```{r}
+library(dplyr)
+
+county_example <- tibble::tibble(
+  County = c("Orange", "Nassau", "Orange", "Sacramento"),
+  State = c("NY", "NY", "CA", "CA"),
+  Income = c(70000, 80000, 90000, 100000)
+)
+
+county_example |>
+  group_by(State) |>
+  summarize(min_income = min(Income), .groups = "drop")
+```
+
+- The table is split into NY and CA piles.
+- R finds the smallest income in each pile.
+- NY answer → 70,000.
+- CA answer → 90,000.
+
+### Pipes: “and then”
+
+- A pipe sends one answer to the next step.
+- `|>` is R's pipe; `%>%` is another pipe used by tidyverse packages.
+
+```r
+counties
+  |> filter(moe_pct > 10)       # and then keep rows above 10
+  |> arrange(desc(moe_pct))     # and then sort biggest first
+  |> select(Name, moe_pct)      # and then keep these two columns
+```
+
+```text
+All counties → filter → sort → select → smaller, ordered table
+```
+
+- This example uses a table named `counties` from class, so it is a practice pattern.
+- Without pipes, save each step in a new object:
+
+```r
+step_1 <- filter(counties, moe_pct > 10)
+step_2 <- arrange(step_1, desc(moe_pct))
+step_3 <- select(step_2, Name, moe_pct)
+```
+
+## Census Data: Counts and Estimates
+
+### Two ways to learn about people
+
+- **Decennial Census**
+  - Counts the population every 10 years.
+  - The old Census long form asked extra questions; today the ACS collects most detailed community information.
+- **American Community Survey (ACS)**
+  - Asks a sample of households questions over time.
+  - Uses the answers to estimate facts about the whole population.
+  - An estimate is not an exact count of every household.
+
+### ACS time periods
+
+- **1-year ACS**
+  - Newer information.
+  - Usually available for places with at least 65,000 people.
+- **5-year ACS**
+  - Combines 5 years of survey answers.
+  - Available for smaller places, including tracts and block groups.
+  - “2016 ACS 5-year” uses data from **2012–2016**.
+- **3-year ACS**
+  - Discontinued after the 2011–2013 release.
+
+### Estimate and margin of error (MOE)
+
+- **Estimate** → the survey's best estimate.
+- **MOE** → the “wiggle room” around that estimate.
+- A simple way to picture the range:
+
+```text
+estimate − MOE  ← likely range →  estimate + MOE
+```
+
+- ACS MOEs use a **90% confidence level**.
+- Bigger MOE compared with the estimate → less precise result.
+- Small places often have bigger MOEs because fewer people answer the survey.
+- Keep the estimate and MOE together when you report a result.
+- One common relative-MOE calculation is `100 × MOE / estimate`.
+  - Example: Adams, `3,334 / 78,975 × 100 ≈ 4.2%`.
+  - The shorthand `moe_pct` values in the class table do not match this formula, so check how that column was made before using it.
+
+### Census table codes
+
+Example code: `B19013_001E`
+
+- `B` → detailed base table.
+- `19013` → table number; B19013 is median household income.
+- `001` → line in the table.
+- `E` → estimate.
+- `M` → margin of error; for example, `B19013_001M`.
+
+## Places and GEOIDs
+
+### Geography gets smaller
+
+```text
+State → County → Census tract → Block group → Block
+large place                                  small place
+```
+
+- A **census tract** is a small area used to organize Census data.
+  - Often about 1,200–8,000 people; target is near 4,000.
+  - It can be a rough neighborhood stand-in, but is not always a real neighborhood.
+- A **block group** is smaller than a tract; small samples can mean larger MOEs.
+- A **block** is the smallest Census area.
+  - Blocks are used in the Decennial Census; ACS estimates generally are not available at block level.
+- Boundaries can change over time, making comparisons tricky.
+  - NHGIS and LTDB offer tools for comparing areas across years.
+
+### GEOID: an ID for a place
+
+- Keep a GEOID as **text**, not a number, so starting zeros stay there.
+- An 11-character tract GEOID is built from three parts:
+
+```text
+42 | 101 | 000100
+state  county  tract
+              ↓
+       42101000100
+```
+
+- `42` → Pennsylvania state code.
+- `101` → county code.
+- `000100` → tract code.
+
+## Getting ACS Data with tidycensus
+
+- `load_variables()` → look up variable codes and labels (like a codebook).
+- `get_acs()` → ask for ACS estimates.
+- A Census API key must be set up for `tidycensus` to download data.
+- This practice example asks for median income and population in Pennsylvania counties:
+
+```{r}
+#| eval: false
+# Install once if needed:
+# install.packages("tidycensus")
+library(tidycensus)
+
+# Look up the codes and labels:
+acs_variables <- load_variables(year = 2023, dataset = "acs5")
+
+# Download the estimates:
+pa_county_acs <- get_acs(
+  geography = "county",
+  variables = c("B19013_001", "B01003_001"),
+  state = "PA",
+  year = 2023,
+  survey = "acs5"
+)
+```
+
+### Long and wide tables
+
+- **Long** → one row for each place-and-variable pair.
+  - A `variable` column says which fact is in that row.
+- **Wide** → one row for each place; each fact gets its own columns.
+- Same information, arranged differently:
+
+```text
+LONG                         WIDE
+County | variable | estimate County | income | population
+Adams  | income   | ...      Adams  | ...    | ...
+Adams  | population | ...
+```
+
+- `get_acs()` returns long data by default.
+- To ask for wide data, add `output = "wide"`:
+
+```r
+pa_county_acs_wide <- get_acs(
+  geography = "county",
+  variables = c("B19013_001", "B01003_001"),
+  state = "PA",
+  year = 2023,
+  survey = "acs5",
+  output = "wide"
+)
+```
+
+- Each variable has an estimate column (`E`) and an MOE column (`M`).
+- The class example below is only a practice illustration; check actual output for the year you request.
+
+| GEOID | County | Variable | Estimate | MOE |
+|:--|:--|:--|--:|--:|
+| 42001 | Adams | B19013_001 | 78,975 | 3,334 |
+| 42001 | Adams | B01003_001 | 102,311 | NA in class note |
+
+## Remember These
+
+- `filter()` picks rows; `select()` picks columns.
+- `mutate()` makes a column; `arrange()` sorts rows.
+- `group_by()` makes groups; `summarize()` makes a short answer for each group.
+- Pipes mean “and then.”
+- ACS values are estimates, so read the MOE too.
+- A 5-year ACS number covers 5 years.
+- GEOIDs are text and tell you which place a row describes.
+
+## Reflection
+
+- R verbs help turn a big table into a smaller answer, one step at a time.
+- Census results make more sense when I check the place, years, estimate, and MOE.
+
+## Questions to Review
+
+- How do I combine MOEs when I calculate a new answer from several ACS estimates?
+- Which crosswalk should I use when tract boundaries changed between two years?
 
 ## Proving R Works
 
-The chunk below runs when this page renders. If you can see a result underneath
-it on your published site, R and Quarto are talking to each other correctly.
+- This small chunk runs when the page is rendered.
+- A version number underneath it means R and Quarto are working together.
 
 ```{r}
 sessionInfo()$R.version$version.string
 ```
-
-## Reflection
-
-<!-- CHANGE THIS: 3-4 sentences -->
-
-
-## Questions I Still Have
-
--
--

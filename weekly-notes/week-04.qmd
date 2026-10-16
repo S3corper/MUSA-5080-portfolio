@@ -1,0 +1,1119 @@
+---
+title: "Week 4: Joins, Spatial Data, and Access to Indego"
+description: "Joining tables, working with coordinate systems, and comparing ways to measure access to bike-share stations."
+date: 2026-09-18
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-copy: true
+execute:
+  echo: true
+  eval: true
+  output: true
+  message: false
+  warning: true
+  error: false
+  freeze: false
+---
+
+## What We Did
+
+This week connected the tables we have been using in R to the places they describe. We practiced joining tables by a shared identifier, adding geographic boundaries to ACS data, checking coordinate reference systems, and using spatial operations to study access to Indego stations in Philadelphia.
+
+The lab asks: **Which low-income tracts are farthest from a station, and how certain are their income estimates?** To answer it, we need to define both "low-income" and "access." Different definitions can produce different answers even when the underlying data is the same.
+
+I used the lab and class recording to fill in these notes. The challenge section is for practice; it is not a record of what our team decided.
+
+## Using This File
+
+The YAML settings show the code and its results. Maps appear below the chunks that create them. The page inherits its theme from `_quarto.yml`.
+
+- `echo: true` displays the code.
+- `eval: true` runs it during rendering.
+- `output: true` displays its output.
+- `code-fold: false` keeps code expanded.
+- `freeze: false` lets this page execute when the project is rendered.
+
+The green Run button in RStudio runs a chunk while I am studying. A regular rendered HTML page displays the saved code and results; it does not provide a live R session in the browser.
+
+### Install packages once, load them each session
+
+Run this installation command in the **R Console** if these packages are not already installed. This is a displayed example, not an executable installation chunk:
+
+```r
+install.packages(
+  c("tidyverse", "tidycensus", "sf"),
+  repos = "https://cloud.r-project.org"
+)
+```
+
+The following setup chunk does execute. Rendering starts its own R session, so packages and objects must be defined in this document rather than only in the Console.
+
+```{r}
+#| label: setup
+library(tidyverse)
+library(tidycensus)
+library(sf)
+
+# Displays only TRUE or FALSE, never the key itself.
+Sys.getenv("CENSUS_API_KEY") != ""
+```
+
+Keep the Census API key in `.Renviron`, not in this document. If I have not configured it, I can run `tidycensus::census_api_key("MY_KEY", install = TRUE)` privately in the Console using my actual key, then restart R. `.Renviron` should be excluded from Git.
+
+### Keep a local data snapshot
+
+The first full render needs an internet connection, a working Census API key, and access to the Indego feed. The download chunks save their results to an RDS folder and reuse those files on later renders. This reduces repeated downloads and stops the live station layer from changing every time I correct a sentence.
+
+```{r}
+#| label: data-folder
+data_dir <- "week04-data"
+dir.create(data_dir, showWarnings = FALSE, recursive = TRUE)
+```
+
+This folder is relative to the document's execution directory. With Quarto's usual file-based execution, it will be inside `weekly-notes/`. If the project sets `execute-dir: project`, it will be at the project root instead. RDS files preserve R objects, including their geometry and CRS. They are data snapshots, not API-key files.
+
+To deliberately refresh a download, delete its corresponding RDS file and render again. Keep the files while studying if I want the same inputs each time. The code remains visible even when it reads a saved snapshot.
+
+## Joining Tables: Match by an Identifier
+
+A join combines information from two tables using a shared **key**. For Census tables, the key is often `GEOID`.
+
+### The example from class
+
+These are small invented tables to make the joins easy to follow. The three-digit identifiers are teaching examples, not real tract GEOIDs.
+
+```{r}
+#| label: example-tables
+income_23_example <- tibble(
+  GEOID = c("100", "200", "300"),
+  med_inc_23 = c(82000, 31500, 45000)
+)
+
+income_15_example <- tibble(
+  GEOID = c("100", "200", "400"),
+  med_inc_15 = c(61000, 27000, 39000)
+)
+
+income_23_example
+income_15_example
+```
+
+```{r}
+#| label: example-left-join
+left_join(income_23_example, income_15_example, by = "GEOID")
+```
+
+The result is:
+
+| GEOID | med_inc_23 | med_inc_15 |
+|:------|-----------:|-----------:|
+| 100 | 82000 | 61000 |
+| 200 | 31500 | 27000 |
+| 300 | 45000 | NA |
+
+The third identifier stays **300** because it came from the left table. It does not become 400. There is no 2015 match for 300, so its new income column contains `NA`. The 2015-only row for 400 is excluded.
+
+Read `left_join(x, y, by = "GEOID")` as: **keep the rows from `x`, find matching keys in `y`, and bring over their columns.**
+
+### Reading the Venn diagram
+
+The photograph from class illustrates **table joins**. Think of the circles as sets of identifiers. The shaded left circle includes identifiers with and without a match; the shared middle contains identifiers found in both tables; both circles together contain all identifiers.
+
+| Join | Rows kept | Identifiers in our example |
+|:-----|:----------|:---------------------------|
+| `left_join(x, y)` | All left-table rows, with any matching right-table data | 100, 200, 300 |
+| `inner_join(x, y)` | Rows with a match in both tables | 100, 200 |
+| `full_join(x, y)` | Rows from both tables, including unmatched rows | 100, 200, 300, 400 |
+| `right_join(x, y)` | All right-table rows, with any matching left-table data | 100, 200, 400 |
+| `anti_join(x, y)` | Left-table rows with no match in the right table | 300 |
+| `semi_join(x, y)` | Left-table rows that have a match; no new columns | 100, 200 |
+
+```{r}
+#| label: compare-table-joins
+inner_join(income_23_example, income_15_example, by = "GEOID")
+full_join(income_23_example, income_15_example, by = "GEOID")
+anti_join(income_23_example, income_15_example, by = "GEOID")
+```
+
+The circles are a memory aid, but real joins match **rows**, not just sets. If a key appears twice in the right table, one matching left row can become two output rows. A left join retains every left row, but it does not always retain the original row count. Swapping the inputs of a left join keeps the other table's rows, which is why we often use a left join instead of switching to a right join. [dplyr join reference](https://dplyr.tidyverse.org/reference/mutate-joins.html)
+
+### Why GEOIDs should be text
+
+A tract GEOID has 11 characters: **2 for the state + 3 for the county + 6 for the tract**. The tract part is six characters, not four. A block-group GEOID adds one more character. [Census GEOID guide](https://www.census.gov/programs-surveys/geography/guidance/geo-identifiers.html)
+
+```{r}
+#| label: geoid-text
+example_geoid <- "06001400100"
+nchar(example_geoid)
+as.numeric(example_geoid)
+```
+
+The numeric conversion drops the leading zero. A GEOID identifies a place; it is not a quantity to calculate with. Store it as character text and use compatible key types on both sides of a join. Changing a damaged number back with `as.character()` does not restore a missing zero automatically.
+
+R is case-sensitive: `GEOID`, `Geoid`, and `geoid` are different names. Function names are also case-sensitive: use `left_join()`, not `Left_join()`.
+
+## Spatial Data: A Table Plus Geometry
+
+An `sf` object is a data frame with a special geometry column and spatial metadata. It can hold points, lines, polygons, or their multi-feature versions. The geometry records the coordinates; the other columns hold attributes such as income or population.
+
+- A bike-share station can be a **POINT**.
+- A street can be a **LINESTRING**.
+- A tract can be a **POLYGON** or **MULTIPOLYGON**.
+
+A polygon needs a closed boundary made from several coordinates. A single coordinate pair is a point, not a complete polygon.
+
+`sf` stands for **simple features**. It is an R package and an object representation. Shapefiles, GeoJSON, and GeoPackages are storage formats that `sf` can read or write; they are not the same thing as an `sf` object. [Introduction to sf](https://r-spatial.github.io/sf/articles/sf1.html)
+
+Three related names appear in R: `sf` is the complete spatial table, `sfc` is its geometry list-column, and `sfg` represents one geometry. `st_geometry(x)` extracts the geometry, while `st_drop_geometry(x)` gives us the attributes without geometry. These are different operations.
+
+### Pull ACS data with boundaries
+
+```{r}
+#| label: pull-tracts
+tract_file <- file.path(data_dir, "philly-tracts-acs2023.rds")
+
+if (file.exists(tract_file)) {
+  tracts_2023_all <- readRDS(tract_file)
+} else {
+  if (Sys.getenv("CENSUS_API_KEY") == "") {
+    stop("Configure CENSUS_API_KEY in .Renviron, restart R, and render again.")
+  }
+
+  tracts_2023_all <- get_acs(
+    geography = "tract",
+    state = "PA",
+    county = "Philadelphia",
+    variables = c(
+      med_inc = "B19013_001",
+      total_pop = "B01003_001"
+    ),
+    year = 2023,
+    survey = "acs5",
+    output = "wide",
+    geometry = TRUE,
+    progress_bar = FALSE
+  )
+
+  saveRDS(tracts_2023_all, tract_file)
+}
+
+class(tracts_2023_all)
+glimpse(tracts_2023_all)
+```
+
+`geometry = TRUE` requests geographic boundaries along with the estimates. `output = "wide"` puts the variables side by side. The aliases create `med_incE`, `med_incM`, `total_popE`, and `total_popM`; `E` means estimate and `M` means margin of error.
+
+The 2023 ACS five-year estimates describe **2019–2023**, not only 2023. Median household income and total population also describe different universes: one summarizes household income, the other counts people. The available download arguments are documented in the [tidycensus `get_acs()` reference](https://search.r-project.org/CRAN/refmans/tidycensus/html/get_acs.html).
+
+### Geometry is sticky
+
+Selecting ordinary columns from an `sf` object normally retains its geometry. That is useful when mapping, but unnecessary for many tables.
+
+```{r}
+#| label: sticky-geometry
+tracts_2023_all %>%
+  select(GEOID, med_incE) %>%
+  head(3)
+
+tracts_2023_all %>%
+  st_drop_geometry() %>%
+  select(GEOID, med_incE) %>%
+  head(3)
+```
+
+`st_drop_geometry()` returns an ordinary table. These pipelines do not change `tracts_2023_all` because we have not assigned their results back to that object. Removing geometry can reduce unnecessary work when summarizing attributes. [sf and tidyverse methods](https://r-spatial.github.io/sf/reference/tidyverse.html)
+
+## Income Reliability and Our First Map
+
+We retain tracts with a positive population estimate, as in the lab. We also keep the original unfiltered object for checking joins later.
+
+```{r}
+#| label: income-reliability
+philly_tracts <- tracts_2023_all %>%
+  filter(total_popE > 0) %>%
+  mutate(
+    med_inc_se = if_else(
+      !is.na(med_incM) & med_incM >= 0,
+      med_incM / 1.645,
+      NA_real_
+    ),
+    med_inc_cv = if_else(
+      !is.na(med_incE) & med_incE > 0,
+      med_inc_se / med_incE * 100,
+      NA_real_
+    ),
+    reliability = case_when(
+      is.na(med_inc_cv) ~ "Unavailable",
+      med_inc_cv < 12 ~ "High",
+      med_inc_cv <= 40 ~ "Moderate",
+      TRUE ~ "Low"
+    )
+  )
+
+philly_tracts %>%
+  st_drop_geometry() %>%
+  count(reliability)
+```
+
+The ACS MOE is normally reported at the 90% confidence level, so we use the conversion in the [Census accuracy worked examples](https://www2.census.gov/programs-surveys/acs/tech_docs/accuracy/2024_ACS_Accuracy_Document_Worked_Examples.pdf):
+
+\[
+SE = MOE / 1.645, \qquad CV = (SE / estimate)\times100.
+\]
+
+These are the lab's **CV** categories: below 12%, 12% through 40%, and above 40%. They are not the Week 2 categories based on `moe_pct`. CV and relative MOE differ by the factor 1.645. The labels summarize relative sampling uncertainty; they do not turn an estimate into a certainty.
+
+The missing-value rule comes first so an unavailable CV does not fall through to "Low." An undefined income estimate is not a zero-dollar income. Income with an invalid or unavailable MOE also cannot receive a numeric CV here.
+
+```{r}
+#| label: income-missing-check
+philly_tracts %>%
+  st_drop_geometry() %>%
+  summarize(
+    retained_tracts = n(),
+    missing_income = sum(is.na(med_incE)),
+    unavailable_cv = sum(is.na(med_inc_cv))
+  )
+```
+
+```{r}
+#| label: income-map
+#| fig-cap: "Median household income estimates for populated Philadelphia tracts. Gray indicates a missing estimate."
+ggplot(philly_tracts) +
+  geom_sf(aes(fill = med_incE), color = NA) +
+  scale_fill_viridis_c(labels = scales::dollar, na.value = "grey80") +
+  theme_void() +
+  labs(
+    title = "Median household income, Philadelphia tracts",
+    subtitle = "2019–2023 ACS five-year estimates",
+    fill = "Income"
+  )
+```
+
+`geom_sf()` reads the geometry column, so we do not need to map separate `x` and `y` columns. `aes(fill = med_incE)` maps income to interior color. `color = NA` removes polygon outlines. `theme_void()` changes presentation, not the data or CRS.
+
+## Joining 2015 Income to 2023 Tracts
+
+This is a join diagnostic exercise. It is **not yet a valid income-change analysis**.
+
+```{r}
+#| label: pull-income-2015
+income15_file <- file.path(data_dir, "philly-income-acs2015.rds")
+
+if (file.exists(income15_file)) {
+  income_15 <- readRDS(income15_file)
+} else {
+  if (Sys.getenv("CENSUS_API_KEY") == "") {
+    stop("Configure CENSUS_API_KEY before downloading the 2015 estimates.")
+  }
+
+  income_15 <- get_acs(
+    geography = "tract",
+    state = "PA",
+    county = "Philadelphia",
+    variables = c(med_inc_15 = "B19013_001"),
+    year = 2015,
+    survey = "acs5",
+    output = "wide",
+    geometry = FALSE
+  ) %>%
+    select(GEOID, med_inc_15E, med_inc_15M)
+
+  saveRDS(income_15, income15_file)
+}
+
+tibble(
+  table = c("All 2023 tracts", "Populated 2023 tracts", "2015 tracts"),
+  rows = c(nrow(tracts_2023_all), nrow(philly_tracts), nrow(income_15))
+)
+```
+
+### Check the keys, then join
+
+```{r}
+#| label: income-join
+stopifnot(
+  is.character(philly_tracts$GEOID),
+  is.character(income_15$GEOID),
+  !anyDuplicated(philly_tracts$GEOID),
+  !anyDuplicated(income_15$GEOID)
+)
+
+n_before_join <- nrow(philly_tracts)
+
+philly_tracts <- philly_tracts %>%
+  left_join(
+    income_15 %>% mutate(in_2015 = TRUE),
+    by = "GEOID"
+  )
+
+stopifnot(nrow(philly_tracts) == n_before_join)
+
+philly_tracts %>%
+  st_drop_geometry() %>%
+  summarize(
+    n_tracts = n(),
+    no_2015_key_match = sum(is.na(in_2015)),
+    matched_but_income_missing = sum(
+      !is.na(in_2015) & is.na(med_inc_15E)
+    )
+  )
+```
+
+`stopifnot()` stops execution if a check fails. `anyDuplicated()` returns zero when there are no duplicates. These checks help prevent an unexpected multiplication of rows.
+
+The extra `in_2015` column distinguishes two situations:
+
+- `in_2015` is missing: the identifier did not match a row in the older table.
+- `in_2015` is `TRUE` but income is missing: the row matched, but its estimate is unavailable.
+
+Testing only `is.na(med_inc_15E)` would mix those situations together.
+
+```{r}
+#| label: unmatched-identifiers
+# Retained 2023 tracts with no 2015 key match.
+philly_tracts %>%
+  st_drop_geometry() %>%
+  filter(is.na(in_2015)) %>%
+  select(GEOID, NAME) %>%
+  head(10)
+
+# Compare against ALL 2023 tracts, so the population filter does not
+# make a still-existing tract look like a missing identifier.
+income_15 %>%
+  anti_join(st_drop_geometry(tracts_2023_all), by = "GEOID") %>%
+  head(10)
+```
+
+### Why a successful join is not enough for change over time
+
+Tracts can split, merge, or change boundaries between Census geography vintages. The 2015 and 2023 ACS products straddle the 2020 tract revisions. A missing match is a reason to investigate; even a matching GEOID does not prove that the geographic footprint stayed identical.
+
+`left_join()` cannot resolve those boundary changes. A spatial join alone cannot resolve them either. Comparing the same places over time can require geographic relationship files or a documented harmonization method. We also need to express income in comparable inflation-adjusted dollars and account for uncertainty. Median incomes cannot simply be added or averaged to reconstruct a new tract's median. [Census geography relationship files](https://www.census.gov/geographies/reference-files/2020/geo/relationship-files.html)
+
+## Coordinate Reference Systems
+
+A **coordinate reference system**, or CRS, explains what coordinates mean: their reference framework, axes, units, and, where applicable, projection. Numbers alone do not tell us whether a point is in Philadelphia, whether its units are feet, or whether its coordinates are longitude and latitude.
+
+### The geoid, ellipsoid, and datum
+
+The recording includes the background behind these terms:
+
+- The **geoid** is a gravity-based reference surface approximating mean sea level, extended under the continents. It is not a model of every mountain and valley.
+- An **ellipsoid** is a smooth mathematical Earth model, slightly flattened at the poles. It gives us a manageable surface for coordinates.
+- A **geodetic datum or reference frame** connects that model and its coordinates to locations on Earth.
+- A **geographic CRS** adds a coordinate system, axes, and angular units to that reference framework. A datum alone is not the entire CRS.
+
+The lowercase **geoid** in this discussion is completely different from the Census **GEOID** identifier. One is a reference surface; the other is a code in our data table. [NOAA's geoid explanation](https://oceanservice.noaa.gov/facts/geoid.html)
+
+The historical example from class was NAD27: it uses the Clarke 1866 ellipsoid and a reference origin at Meades Ranch, Kansas. NAD83 uses GRS80 and was developed with a geocentric reference framework. The same numeric longitude and latitude can therefore refer to different ground positions under different datums. WGS84 is another widely used global reference system associated with GPS. [NOAA's datum FAQ](https://geodesy.noaa.gov/datums/faq.shtml)
+
+The practical lesson is to inspect the full CRS, not just check whether both layers use degrees. A datum mismatch can create a location offset even when two layers look almost aligned. The size of that offset depends on the systems and location; there is no universal correction to add by hand.
+
+### Geographic and projected coordinates
+
+| Family | Typical coordinates | Units | Main point |
+|:-------|:--------------------|:------|:-----------|
+| Geographic | Longitude and latitude | Degrees | Angular positions on an Earth model |
+| Projected | Easting and northing | Often meters or feet | Planar coordinates designed for a region or purpose |
+
+A degree of longitude does not have the same ground length at every latitude. A buffer distance of `0.5` is therefore not automatically half a mile. For this lab, a local projected CRS makes distances and areas easier to interpret.
+
+Geographic coordinates can still support geodesic distance calculations with appropriate software. The point is to understand the calculation and units, not to assume every operation in longitude and latitude is invalid.
+
+In the common signed decimal-degree convention, longitude runs from -180 to 180 and latitude from -90 to 90. A Philadelphia coordinate near longitude -75 and latitude 40 is plausible. Those ranges are useful clues, not proof of a CRS. Confirm the metadata. In typical `sf` point construction, `x` is longitude and `y` is latitude when supplying longitude/latitude coordinates.
+
+### Projections preserve different properties
+
+Common projection families include cylindrical, transverse cylindrical, conic, and azimuthal (planar). These describe how a projection is constructed. A separate question is **what it preserves**.
+
+The class demonstration used an orange and a sheet of paper to explain flattening a curved surface. It is a useful analogy for distortion, although many projections are mathematical transformations rather than literal shadows from a light. Tangent and secant constructions help explain reference lines or points where scale is controlled. A projection works best in its intended region, not equally well everywhere.
+
+| Property | Meaning | Caution |
+|:---------|:--------|:--------|
+| Conformal | Preserves local angles and shapes at very small scales | Does not preserve area; Lambert Conformal Conic is an example |
+| Equal-area | Preserves area relationships | Useful when area comparison matters; shapes can be distorted |
+| Equidistant | Preserves specified distances, such as from a chosen center | Does not preserve every distance everywhere |
+| Direction | Some projections preserve bearings from a chosen center | No flat map preserves every direction, area, and distance globally |
+
+Mercator is conformal and shows constant-bearing routes, or rhumb lines, as straight lines. That does not mean every straight line is the shortest route, or that all distances and directions between arbitrary points are preserved.
+
+### CRS codes used in class
+
+| EPSG | CRS | Units | Useful context |
+|-----:|:----|:------|:---------------|
+| 2272 | NAD83 / Pennsylvania South (ftUS) | **US survey feet** | Local analysis around Philadelphia |
+| 5070 | NAD83 / Conus Albers | Meters | Equal-area work across the contiguous United States |
+| 4326 | WGS 84 | Degrees | Common geographic coordinates |
+| 4269 | NAD83 | Degrees | Common in US geographic datasets |
+| 26918 | NAD83 / UTM zone 18N | Meters | A projected option for Philadelphia |
+
+EPSG 2272 is specifically the US survey-foot version. It is not "feet or meters" interchangeably. A meter-based State Plane definition uses a different CRS code.
+
+UTM divides the world into 60 numbered longitudinal zones, with northern and southern hemisphere versions. Zone numbers run from 1 to 60; there are no negative zone numbers. The hemisphere and datum matter as well as the zone. Large easting and northing values are normal and do not mean the coordinates are wrong.
+
+### Inspect, transform, or label?
+
+| Function | What it does |
+|:---------|:-------------|
+| `st_crs(x)` | Reads the object's CRS metadata |
+| `st_transform(x, 2272)` | Converts coordinates from their known source CRS to the target CRS |
+| `st_set_crs(x, 4326)` | Assigns or replaces a CRS label without moving the coordinates |
+
+The normal workflow is **check the CRS, then transform if needed**. There is no extra `st_set_crs()` step after `st_transform()`.
+
+The recording's jar analogy helps: putting a "salt" label on a jar of sugar does not change what is inside. Likewise, calling `st_set_crs(x, 2272)` on longitude/latitude numbers does not convert them into feet. It only gives those same numbers a different interpretation. `st_transform()` performs the coordinate conversion and updates the label together.
+
+Only use `st_set_crs()` when reliable information establishes what the existing coordinates already mean. Assigning a label to unknown coordinates by guesswork can place the data in the wrong location. [sf transformation reference](https://r-spatial.github.io/sf/reference/st_transform.html)
+
+## Bring in Indego Stations
+
+Indego provides station locations through a live GeoJSON feed. This snapshot records when it was retrieved. It does **not** represent a historical 2023 station network merely because the income estimates end in 2023.
+
+```{r}
+#| label: station-download
+station_file <- file.path(data_dir, "indego-station-snapshot.rds")
+
+if (file.exists(station_file)) {
+  station_snapshot <- readRDS(station_file)
+} else {
+  station_snapshot <- list(
+    retrieved_at = Sys.time(),
+    data = st_read(
+      "https://www.rideindego.com/stations/json/",
+      quiet = TRUE
+    )
+  )
+  saveRDS(station_snapshot, station_file)
+}
+
+stations <- station_snapshot$data %>%
+  mutate(station_row = row_number())
+
+station_snapshot$retrieved_at
+nrow(stations)
+glimpse(stations)
+
+stopifnot(nrow(stations) > 0, "name" %in% names(stations))
+```
+
+If the live feed is unavailable, the first download will fail. A previously saved snapshot can still be used. Do not quietly replace real station data with invented points and treat that as the lab result.
+
+### Put both layers in the same CRS
+
+```{r}
+#| label: project-layers
+st_crs(philly_tracts)$epsg
+st_crs(stations)$epsg
+
+stopifnot(!is.na(st_crs(philly_tracts)), !is.na(st_crs(stations)))
+
+philly_tracts <- st_transform(philly_tracts, crs = 2272)
+stations <- st_transform(stations, crs = 2272)
+
+st_crs(philly_tracts)$units_gdal
+st_crs(stations)$units_gdal
+stopifnot(st_crs(philly_tracts) == st_crs(stations))
+```
+
+Here the reported units should be US survey feet. The lab uses **5,280 feet per mile**, so its half-mile buffer is **2,640 coordinate feet**. The distinction between a US survey foot and an international foot is tiny for this classroom buffer, but the CRS definition should still be recorded accurately.
+
+```{r}
+#| label: stations-map
+ggplot() +
+  geom_sf(data = philly_tracts, fill = "grey95", color = "white", linewidth = 0.2) +
+  geom_sf(data = stations, color = "#C43C39", size = 0.8) +
+  theme_void() +
+  labs(
+    title = "Indego stations and Philadelphia tracts",
+    subtitle = paste("Station snapshot:", as.Date(station_snapshot$retrieved_at))
+  )
+```
+
+Later layers are drawn over earlier layers. Drawing the stations last makes them visible above the tract polygons. Some stations may lie outside the retained tracts; the next sections check this rather than assuming every station matches.
+
+## Spatial Operations: Match by Location
+
+Table joins ask whether keys match. Spatial operations ask whether geometries have a relationship, such as intersecting, touching, containing, or being within a specified distance.
+
+### Predicates answer a relationship question
+
+| Function | Relationship tested |
+|:---------|:--------------------|
+| `st_intersects(x, y)` | The features share any point, including a boundary point |
+| `st_touches(x, y)` | The boundaries meet, but the interiors do not intersect |
+| `st_within(x, y)` | Each feature in `x` lies within a feature in `y`, according to the predicate's boundary rules |
+| `st_contains(x, y)` | The corresponding containment question with the roles reversed |
+| `st_disjoint(x, y)` | The features share no points |
+| `st_is_within_distance(x, y, dist = ...)` | Their minimum distance is within the supplied distance |
+
+`st_touches()` is more specific than everyday "touches." A tract overlapping the inside of a station buffer **intersects** it; it usually does not satisfy `st_touches()`. Use `st_intersects()` when "any overlap or contact" is the intended rule. [sf spatial predicates](https://r-spatial.github.io/sf/reference/geos_binary_pred.html)
+
+For the classroom polygon example, imagine polygon B beside A with a shared edge, C entirely inside A, and D separated from A:
+
+| Relationship to A | Intersects A? | Touches A? | Within A? |
+|:------------------|:-------------|:-----------|:----------|
+| B shares an edge, with no interior overlap | TRUE | TRUE | FALSE |
+| C is entirely inside A, away from its boundary | TRUE | FALSE | TRUE |
+| D is separated from A | FALSE | FALSE | FALSE |
+
+"Intersects" is the broad test. It includes containment as well as boundary contact and partial overlap. "Touches" excludes interior overlap.
+
+The default result of many predicates is a sparse list of matching row positions. For example, the first element of `st_intersects(tracts, stations)` tells us which station rows intersect the first tract. `lengths()` counts matches for every element of that list. The singular `length()` would count the list's elements, usually the number of input tracts.
+
+### Filter, join, or change the shapes?
+
+| Operation | Result | Does it cut the original shapes? |
+|:----------|:-------|:--------------------------------|
+| `st_filter(x, y)` | Selected whole features from `x` | No |
+| `st_join(x, y)` | Features of `x` with matched attributes from `y` | No; rows may repeat for multiple matches |
+| `st_intersection(x, y)` | Shared geometric portions | Yes |
+| `st_difference(x, y)` | Portions of `x` outside `y` | Yes |
+| `st_sym_difference(x, y)` | Portions belonging to one side but not both | Yes |
+| `st_union(x)` | Combined geometry with internal overlap dissolved | Merges shapes |
+| `st_distance(x, y)` | Distances between features | Returns measurements, not a new polygon layer |
+
+`st_union()` combines geometric coverage; it does not automatically add population or compute an income statistic. Likewise, `st_intersection()` can copy attributes to fragments, but it does not automatically estimate how many residents live in each fragment. [sf geometry operations](https://r-spatial.github.io/sf/reference/geos_binary_ops.html)
+
+Names can differ in meaning across GIS software. In this lab, the one-input `st_union(x)` dissolves the geometries together. Do not assume it produces the same attribute-preserving polygon subdivision as a desktop GIS tool named "Union."
+
+### A spatial version of the overlapping-circle picture
+
+Unlike the table-join diagram, this picture shows actual **areas** being combined or cut. The circles below are synthetic teaching shapes, not Indego results.
+
+```{r}
+#| label: spatial-operation-diagram
+#| fig-width: 8
+#| fig-height: 5
+#| fig-cap: "Colored regions are the output of each operation. The gray outlines show the two original circles."
+circle_a <- st_sfc(st_point(c(2600000, 240000)), crs = 2272) %>%
+  st_buffer(dist = 800)
+circle_b <- st_sfc(st_point(c(2601000, 240000)), crs = 2272) %>%
+  st_buffer(dist = 800)
+
+original_circles <- st_sf(geometry = c(circle_a, circle_b))
+
+operation_shapes <- st_sf(
+  operation = factor(
+    c("Intersection: shared area", "Union: either circle",
+      "Difference: A outside B", "Symmetric difference: one only"),
+    levels = c("Intersection: shared area", "Union: either circle",
+               "Difference: A outside B", "Symmetric difference: one only")
+  ),
+  geometry = c(
+    st_intersection(circle_a, circle_b),
+    st_union(c(circle_a, circle_b)),
+    st_difference(circle_a, circle_b),
+    st_sym_difference(circle_a, circle_b)
+  )
+)
+
+ggplot() +
+  geom_sf(data = operation_shapes, fill = "#2A9D8F", color = NA) +
+  geom_sf(data = original_circles, fill = NA, color = "grey35") +
+  facet_wrap(~operation, ncol = 2) +
+  coord_sf(datum = NA) +
+  theme_void()
+```
+
+## Spatial Join: Give Each Station Its Tract's Attributes
+
+```{r}
+#| label: station-tract-join
+stations_with_tract <- st_join(
+  stations,
+  philly_tracts %>% select(GEOID, med_incE, reliability),
+  join = st_intersects,
+  left = TRUE
+)
+
+stations_with_tract %>%
+  st_drop_geometry() %>%
+  select(station_row, name, GEOID, med_incE, reliability) %>%
+  head(10)
+```
+
+This keeps station points and attaches the attributes of intersecting tracts. A station does not need its own GEOID beforehand. `left = TRUE` retains unmatched stations, which get missing tract attributes. A station on a shared boundary can intersect more than one tract and appear in more than one output row. [sf spatial joins](https://r-spatial.github.io/sf/reference/st_join.html)
+
+### Count stations per tract in two ways
+
+```{r}
+#| label: station-counts
+station_counts <- stations_with_tract %>%
+  st_drop_geometry() %>%
+  filter(!is.na(GEOID)) %>%
+  count(GEOID, name = "n_stations_from_join")
+
+philly_tracts <- philly_tracts %>%
+  mutate(n_stations = lengths(st_intersects(., stations)))
+
+count_check <- philly_tracts %>%
+  st_drop_geometry() %>%
+  select(GEOID, n_stations) %>%
+  left_join(station_counts, by = "GEOID") %>%
+  mutate(n_stations_from_join = replace_na(n_stations_from_join, 0L))
+
+stopifnot(all(count_check$n_stations == count_check$n_stations_from_join))
+head(count_check)
+```
+
+The dot in `st_intersects(., stations)` refers to the tract data coming through the `%>%` pipeline. This route includes zero-station tracts directly. The join-and-count route needs missing counts filled with zero when it is attached back to all tracts.
+
+### Why the total can differ from the station count
+
+```{r}
+#| label: station-match-checks
+station_matches <- st_intersects(stations, philly_tracts)
+
+tibble(
+  station_rows = nrow(stations),
+  station_tract_matches = sum(philly_tracts$n_stations),
+  stations_with_no_tract = sum(lengths(station_matches) == 0),
+  stations_with_multiple_tracts = sum(lengths(station_matches) > 1)
+)
+
+stations_with_tract %>%
+  st_drop_geometry() %>%
+  filter(is.na(GEOID)) %>%
+  select(station_row, name) %>%
+  head(10)
+
+stations %>%
+  mutate(n_tract_matches = lengths(station_matches)) %>%
+  filter(n_tract_matches > 1) %>%
+  st_drop_geometry() %>%
+  select(station_row, name, n_tract_matches)
+```
+
+Possible reasons include stations outside Philadelphia, stations in tracts removed by the population filter, and points exactly on a shared boundary. The sum of tract counts is a count of **matches**, not necessarily a count of unique stations. Check the results before deciding how to handle boundary cases.
+
+## Distance to the Nearest Station
+
+### A tract needs a representative point
+
+```{r}
+#| label: tract-centroids
+centroids <- st_centroid(st_geometry(philly_tracts))
+```
+
+We use each tract's geometric centroid as a simple starting location. A centroid is not necessarily where most residents live, and it can fall outside an irregular polygon. `st_point_on_surface()` gives a point inside the polygon, but that point is not automatically a population center either.
+
+### All pairs versus one pair per tract
+
+```{r}
+#| label: distance-matrix
+distance_matrix <- st_distance(centroids, stations)
+dim(distance_matrix)
+distance_matrix[
+  seq_len(min(3, nrow(distance_matrix))),
+  seq_len(min(3, ncol(distance_matrix))),
+  drop = FALSE
+]
+```
+
+The rows represent tract centroids and the columns represent stations. Each cell is the distance for that pair. These measurements carry units. Without `by_element = TRUE`, this is a full matrix, not one distance per tract. Large all-pairs matrices can be expensive, so the next approach is more useful when we only need the nearest station. [sf distance measurements](https://r-spatial.github.io/sf/reference/geos_measures.html)
+
+The geometries I pass in change the question. `st_distance(philly_tracts, stations)` measures the minimum distance between each **polygon** and each station, so a station inside a tract has distance zero from that tract. Using `centroids` instead measures from its representative point. Distance to a tract's boundary or footprint and distance from its centroid are not interchangeable.
+
+```{r}
+#| label: nearest-station
+nearest_idx <- st_nearest_feature(centroids, stations)
+
+philly_tracts <- philly_tracts %>%
+  mutate(
+    nearest_station = stations$name[nearest_idx],
+    dist_ft = as.numeric(
+      st_distance(
+        centroids,
+        stations[nearest_idx, ],
+        by_element = TRUE
+      )
+    ),
+    dist_mi = dist_ft / 5280
+  )
+
+summary(philly_tracts$dist_mi)
+```
+
+`nearest_idx` contains station **row positions**, not distances. `stations[nearest_idx, ]` selects one matching station per tract, in tract order. `by_element = TRUE` then compares the first centroid with the first selected station, the second with the second, and so on.
+
+If I were sorting distances manually, the nearest would be the **smallest** distance: ascending order. `arrange(desc(distance))` would put the farthest first. `st_nearest_feature()` avoids building and sorting a full distance table for this task.
+
+`as.numeric()` removes the units label after we have checked that the CRS uses feet. Dividing by 5,280 expresses the distance in the lab's miles. These are straight-line distances, not walking routes. Rivers, rail yards, highways, entrances, and bridges can make a short straight-line distance a much longer journey.
+
+```{r}
+#| label: nearest-distance-map
+ggplot(philly_tracts) +
+  geom_sf(aes(fill = dist_mi), color = NA) +
+  geom_sf(data = stations, inherit.aes = FALSE, size = 0.5, color = "white") +
+  scale_fill_viridis_c() +
+  theme_void() +
+  labs(
+    title = "Distance from tract centroid to nearest Indego station",
+    subtitle = "Straight-line distance; white points are stations",
+    fill = "Miles"
+  )
+```
+
+## Half-Mile Buffers: Filter Whole Tracts or Cut Their Shapes
+
+A buffer creates an area within a specified distance of a feature. Here each station gets a 2,640-foot circle. Unioning the buffers combines overlapping circles so shared areas are not counted repeatedly.
+
+```{r}
+#| label: station-buffer
+station_zone <- stations %>%
+  st_buffer(dist = 2640) %>%
+  st_union()
+
+ggplot() +
+  geom_sf(data = philly_tracts, fill = "grey95", color = "white", linewidth = 0.2) +
+  geom_sf(data = station_zone, fill = "#56B4E9", color = NA, alpha = 0.5) +
+  geom_sf(data = stations, size = 0.4) +
+  theme_void() +
+  labs(
+    title = "Half-mile zones around Indego stations",
+    subtitle = "Overlapping station buffers have been dissolved into one geometry"
+  )
+```
+
+The union can contain separated pieces in a MULTIPOLYGON. "One geometry" does not mean every station circle connects to every other one. [sf buffers and other unary operations](https://r-spatial.github.io/sf/reference/geos_unary.html)
+
+### st_filter(): keep the whole tract
+
+```{r}
+#| label: filter-buffer
+tracts_near_stations <- st_filter(philly_tracts, station_zone)
+
+outside_zone <- st_filter(
+  philly_tracts,
+  station_zone,
+  .predicate = st_disjoint
+)
+
+tibble(
+  relationship = c("Any intersection with zone", "No intersection with zone"),
+  n_tracts = c(nrow(tracts_near_stations), nrow(outside_zone))
+)
+```
+
+The default filter predicate is `st_intersects()`. A tract with even a tiny overlap, or just a shared boundary point, is selected whole. Its geometry is not trimmed to the buffer.
+
+If the question instead asks for tracts entirely within the zone, make that predicate explicit:
+
+```{r}
+#| label: entirely-within-zone
+entirely_within_zone <- st_filter(
+  philly_tracts,
+  station_zone,
+  .predicate = st_within
+)
+nrow(entirely_within_zone)
+```
+
+`st_filter()` returns selected features. `nrow()` counts them. The function does not return a count by itself, and it does not require full containment unless we choose that relationship.
+
+We use the **unioned** station zone for the disjoint test. Filtering for disjointness against individual station buffers could retain a tract simply because it is far from one station, even if it is beside another.
+
+### st_intersection(): keep only the covered portion
+
+```{r}
+#| label: tract-coverage
+philly_tracts <- philly_tracts %>%
+  mutate(tract_area = as.numeric(st_area(.)))
+
+covered <- philly_tracts %>%
+  select(GEOID) %>%
+  st_intersection(station_zone) %>%
+  mutate(covered_area = as.numeric(st_area(.))) %>%
+  st_drop_geometry() %>%
+  group_by(GEOID) %>%
+  summarize(covered_area = sum(covered_area), .groups = "drop")
+
+philly_tracts <- philly_tracts %>%
+  left_join(covered, by = "GEOID") %>%
+  mutate(
+    covered_area = replace_na(covered_area, 0),
+    pct_covered = if_else(
+      tract_area > 0,
+      100 * covered_area / tract_area,
+      NA_real_
+    )
+  )
+
+stopifnot(!anyDuplicated(philly_tracts$GEOID))
+summary(philly_tracts$pct_covered)
+```
+
+The steps are:
+
+1. Measure each original tract's area.
+2. Cut the tract at the station-zone boundary.
+3. Measure the retained portion and sum any fragments for that GEOID.
+4. Drop geometry from the coverage table.
+5. Join the measurements back to the original whole tracts.
+6. Divide covered area by original area and multiply by 100.
+
+Both areas use the same squared units, so the units cancel in the percentage. A tract with no intersecting portion has zero covered area. We join only one coverage record per GEOID to prevent duplicated tract rows.
+
+We select only `GEOID` before the intersection because we need a spatial measurement, not copied income estimates on each fragment. An income estimate does not become an estimate for the clipped fragment just because its polygon was cut.
+
+Some `sf` versions print a warning that attributes are assumed to be spatially constant when performing an overlay. Here the retained attribute is just the tract identifier. We are measuring clipped geometry, not assuming that income or population is evenly distributed inside the tract.
+
+```{r}
+#| label: coverage-map
+ggplot(philly_tracts) +
+  geom_sf(aes(fill = pct_covered), color = NA) +
+  scale_fill_viridis_c(
+    labels = function(x) paste0(round(x), "%"),
+    na.value = "grey80"
+  ) +
+  theme_void() +
+  labs(
+    title = "Tract area within half a mile of an Indego station",
+    subtitle = "Area coverage is not the percentage of residents served",
+    fill = "Area covered"
+  )
+```
+
+A tract could be half covered by area while most homes are in its uncovered half. Water, industrial land, parks, and uneven settlement matter. This is an area-based indicator, not a direct resident-access rate.
+
+## Worked Challenge: Which Low-Income Tracts Lack Access?
+
+For this example:
+
+- **Low income:** a tract's 2019–2023 median household income is at or below the 25th percentile among populated Philadelphia tracts with a known positive estimate.
+- **Access:** the tract centroid is within half a mile of its nearest station.
+
+This is a relative citywide income definition, not an official poverty threshold. Ties at the cutoff can put slightly more than 25% of eligible tracts in the group. Missing income stays unknown and is not treated as high income.
+
+```{r}
+#| label: challenge-definitions
+known_income <- philly_tracts$med_incE[
+  !is.na(philly_tracts$med_incE) & philly_tracts$med_incE > 0
+]
+stopifnot(length(known_income) > 0)
+
+income_cutoff <- unname(quantile(known_income, probs = 0.25))
+
+philly_tracts <- philly_tracts %>%
+  mutate(
+    low_income = case_when(
+      is.na(med_incE) | med_incE <= 0 ~ NA,
+      TRUE ~ med_incE <= income_cutoff
+    ),
+    access_centroid = dist_mi <= 0.5,
+    access_any_overlap = lengths(st_intersects(., station_zone)) > 0,
+    access_half_area = pct_covered >= 50
+  )
+
+scales::dollar(income_cutoff)
+
+philly_tracts %>%
+  st_drop_geometry() %>%
+  summarize(
+    total_tracts = n(),
+    income_status_unknown = sum(is.na(low_income)),
+    low_income_tracts = sum(low_income, na.rm = TRUE),
+    low_income_without_centroid_access = sum(
+      low_income & !access_centroid,
+      na.rm = TRUE
+    )
+  )
+```
+
+The cutoff is calculated from this dataset. It will print above rather than being guessed in the notes. `na.rm = TRUE` excludes unknown values from the count; the separate unknown count makes that exclusion visible.
+
+### Map and list the selected tracts
+
+```{r}
+#| label: challenge-map
+low_income_no_access <- philly_tracts %>%
+  filter(low_income, !access_centroid)
+
+ggplot() +
+  geom_sf(data = philly_tracts, fill = "grey92", color = "white", linewidth = 0.2) +
+  geom_sf(data = low_income_no_access, fill = "#D55E00", color = "white", linewidth = 0.2) +
+  geom_sf(data = stations, color = "#0072B2", size = 0.6) +
+  theme_void() +
+  labs(
+    title = "Low-income tracts with centroids over half a mile from Indego",
+    subtitle = paste(
+      "Income at or below", scales::dollar(income_cutoff),
+      "| Orange: selected tracts; blue: stations"
+    ),
+    caption = paste("Station snapshot:", as.Date(station_snapshot$retrieved_at))
+  )
+
+low_income_no_access %>%
+  st_drop_geometry() %>%
+  arrange(desc(dist_mi)) %>%
+  select(GEOID, NAME, med_incE, med_incM, med_inc_cv,
+         reliability, nearest_station, dist_mi) %>%
+  head(15)
+```
+
+```{r}
+#| label: selected-reliability
+low_income_no_access %>%
+  st_drop_geometry() %>%
+  count(reliability, name = "n_tracts")
+```
+
+An income estimate with a CV of 45% remains in the selected list if its point estimate meets our income rule, but its reliability label will be "Low." We should report that uncertainty. Silently dropping all uncertain tracts could hide communities with weak statistical coverage.
+
+High sampling reliability also does not guarantee that a tract is clearly below a chosen cutoff. An estimate very close to the cutoff can have an interval that crosses it. This classification is a screening tool, not a definitive finding about every household.
+
+### Show the farthest selected tracts
+
+```{r}
+#| label: farthest-low-income-chart
+farthest_selected <- low_income_no_access %>%
+  st_drop_geometry() %>%
+  arrange(desc(dist_mi)) %>%
+  slice_head(n = 15)
+
+ggplot(
+  farthest_selected,
+  aes(x = reorder(GEOID, dist_mi), y = dist_mi, color = reliability)
+) +
+  geom_point(size = 2.5) +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    title = "Farthest low-income tracts under the centroid definition",
+    subtitle = "Up to 15 tracts; color describes income reliability",
+    x = "Tract GEOID",
+    y = "Miles to nearest station",
+    color = "Income reliability"
+  )
+```
+
+`reorder(GEOID, dist_mi)` orders the labels by distance. `coord_flip()` makes those labels easier to read. The color refers to uncertainty in the **income estimate**, not uncertainty in the measured distance. If no tracts meet the definition, the table and plot will be empty rather than inventing a result.
+
+### Compare all three access definitions
+
+```{r}
+#| label: compare-access-definitions
+access_comparison <- philly_tracts %>%
+  st_drop_geometry() %>%
+  filter(low_income) %>%
+  summarize(
+    `Centroid within 0.5 mile` = sum(!access_centroid),
+    `Any overlap with station zone` = sum(!access_any_overlap),
+    `At least 50% of tract area covered` = sum(!access_half_area)
+  ) %>%
+  pivot_longer(
+    everything(),
+    names_to = "access_definition",
+    values_to = "low_income_without_access"
+  )
+
+access_comparison
+
+ggplot(
+  access_comparison,
+  aes(x = access_definition, y = low_income_without_access)
+) +
+  geom_col(fill = "steelblue") +
+  geom_text(aes(label = low_income_without_access), hjust = -0.15) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    title = "The access definition changes the count",
+    x = NULL,
+    y = "Low-income tracts without access"
+  )
+```
+
+Each row uses the same low-income group and station snapshot. Only the access rule changes. The any-overlap rule can classify a tract as served when the station zone covers just a small corner. The 50%-area rule demands more coverage but still makes no claim about where residents live. The centroid rule is easy to explain but reduces an entire tract to one point.
+
+A possible defense of the worked choice is: *I used centroid distance as a first screening measure because it gives each tract a comparable distance to its nearest station. It does not describe every resident's journey, so I also compared overlap and area coverage to see how much the result depends on that choice.*
+
+## Extra Check: Does the Representative Point Matter?
+
+```{r}
+#| label: point-on-surface-check
+inside_points <- st_point_on_surface(st_geometry(philly_tracts))
+inside_nearest <- st_nearest_feature(inside_points, stations)
+
+point_comparison <- philly_tracts %>%
+  st_drop_geometry() %>%
+  select(GEOID, NAME, dist_mi) %>%
+  mutate(
+    inside_point_mi = as.numeric(
+      st_distance(
+        inside_points,
+        stations[inside_nearest, ],
+        by_element = TRUE
+      )
+    ) / 5280,
+    distance_difference = inside_point_mi - dist_mi,
+    access_class_changed = (inside_point_mi <= 0.5) != (dist_mi <= 0.5)
+  )
+
+point_comparison %>%
+  arrange(desc(abs(distance_difference))) %>%
+  head(10)
+
+count(point_comparison, access_class_changed)
+```
+
+This is a sensitivity check. A point inside the tract is not automatically a better representation of residents than its centroid. Population-weighted locations or a street-network analysis could answer a more detailed access question, but they require additional data and decisions.
+
+## What We Can and Cannot Conclude
+
+- **Income:** a tract median describes households collectively. It does not establish that every resident is low-income.
+- **Sampling uncertainty:** CV and MOE help describe uncertainty in the ACS estimate. They do not account for every possible source of error.
+- **Location:** an intersecting station, a nearby centroid, and a large covered area measure different things.
+- **Travel:** straight-line proximity does not measure walking time, safe crossings, or cycling conditions.
+- **Service:** a station point does not guarantee available bikes, available docks, affordable membership, or reliable service. The feed's `totalDocks` field, if present, could support a separate capacity question.
+- **Time:** the station snapshot is contemporary to its download; the ACS estimates describe 2019–2023. This is not a reconstruction of 2023 service unless we obtain historical station data.
+- **Boundaries:** joining records is not the same as making different geography vintages comparable.
+
+These checks help distinguish a useful screening map from a stronger claim about who Indego actually serves.
+
+## My Mental Model
+
+I start with a question, then decide what one row and one place represent. I check identifiers before a table join and coordinate systems before a spatial operation. I use a predicate to test a relationship, a filter to keep whole features, an overlay to create new shapes, and a join to attach attributes.
+
+The biggest lesson from the lab is that "access" needs a definition. A map can look precise while hiding choices about boundaries, distance, population, and uncertainty. I need to state those choices so another person can understand what the result actually measures.
+
+### My September 18 class-note recap
+
+My notes from September 18, 2026, reduce the workflow to a few checks I want to remember:
+
+- **Join by the same GEOID.** A `left_join()` keeps the left table's rows and attaches matching columns. If a key does not match, the new value is `NA`; check the key type, duplicates, and row count.
+- **Remember that geometry sticks.** Selecting columns from an `sf` object usually keeps its geometry. Use `st_drop_geometry()` when I only need an ordinary attribute table.
+- **Read the CRS before measuring.** Geographic coordinates use longitude and latitude in degrees. Projected coordinates use eastings and northings in a local unit such as feet or meters. For Philadelphia, EPSG 2272 is NAD83 / Pennsylvania South in US survey feet; 5,280 feet make a mile.
+- **Do not confuse labeling with conversion.** `st_crs()` checks the metadata, `st_transform()` converts coordinates, and `st_set_crs()` only assigns a label to coordinates whose CRS is already known.
+- **Choose the spatial operation by the question.** Predicates such as `st_intersects()` test a relationship; `st_filter()` keeps whole features; `st_intersection()` cuts to shared areas; `st_union()` dissolves overlaps; `st_join()` attaches attributes by location.
+- **Check the shape of distance output.** `st_distance(x, y)` normally returns distances for every pair as a matrix. Find the nearest feature first and use `by_element = TRUE` when I need one matched distance per tract.
+
+Those reminders connect my class shorthand to the full examples above. For example, a half-mile buffer in EPSG 2272 uses 2,640 feet, and the chosen predicate determines whether a tract merely touches the zone, overlaps it, or lies within it.
+
+## Quick Reference
+
+| Task | Function or pattern |
+|:-----|:--------------------|
+| Join attributes by ID | `left_join(x, y, by = "GEOID")` |
+| Find unmatched keys | `anti_join(x, y, by = "GEOID")` |
+| Remove geometry for a table | `st_drop_geometry(x)` |
+| Read a spatial file or GeoJSON URL | `st_read(...)` |
+| Check a CRS | `st_crs(x)` |
+| Convert coordinates | `st_transform(x, 2272)` |
+| Label known existing coordinates | `st_set_crs(x, ...)` |
+| Count spatial matches | `lengths(st_intersects(x, y))` |
+| Attach attributes by location | `st_join(x, y)` |
+| Keep whole intersecting features | `st_filter(x, y)` |
+| Create a distance zone | `st_buffer(x, dist = ...)` |
+| Merge overlapping zones | `st_union(x)` |
+| Cut to shared area | `st_intersection(x, y)` |
+| Measure area | `st_area(x)` |
+| Find nearest feature row | `st_nearest_feature(x, y)` |
+| Measure corresponding pairs | `st_distance(x, y, by_element = TRUE)` |
+| Draw spatial features | `geom_sf()` |
