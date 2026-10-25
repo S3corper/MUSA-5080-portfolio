@@ -1,13 +1,10 @@
-/* Match the Week 07 reference's reading rhythm and heading scale.
-   Quarto uses a 17px root: desktop headings are 34px / 28.05px / 24.65px. */
 body {
   line-height: 1.7;
 }
 
-/* Keep the site header as compact as the reference's roughly 65px bar. */
 #quarto-header .navbar {
   padding-block: 0.6rem;
-  line-height: 1.5;
+  line-height: 0.5;
 }
 
 main.content h1 {
