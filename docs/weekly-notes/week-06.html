@@ -173,7 +173,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <ul>
   <li><a href="#big-picture" id="toc-big-picture" class="nav-link active" data-scroll-target="#big-picture"><span class="header-section-number">1</span> Big picture</a></li>
   <li><a href="#example-data-and-model-comparison" id="toc-example-data-and-model-comparison" class="nav-link" data-scroll-target="#example-data-and-model-comparison"><span class="header-section-number">2</span> Example data and model comparison</a></li>
-  <li><a href="#log-transformations" id="toc-log-transformations" class="nav-link" data-scroll-target="#log-transformations"><span class="header-section-number">3</span> 1. Log transformations</a>
+  <li><a href="#log-transformations" id="toc-log-transformations" class="nav-link" data-scroll-target="#log-transformations"><span class="header-section-number">3</span> Log transformations</a>
   <ul class="collapse">
   <li><a href="#why-log" id="toc-why-log" class="nav-link" data-scroll-target="#why-log"><span class="header-section-number">3.1</span> Why log?</a>
   <ul class="collapse">
@@ -182,10 +182,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#zeros-log1p" id="toc-zeros-log1p" class="nav-link" data-scroll-target="#zeros-log1p"><span class="header-section-number">3.2</span> Zeros: log1p()</a></li>
   <li><a href="#log-the-outcome" id="toc-log-the-outcome" class="nav-link" data-scroll-target="#log-the-outcome"><span class="header-section-number">3.3</span> Log the outcome</a></li>
   </ul></li>
-  <li><a href="#squared-terms" id="toc-squared-terms" class="nav-link" data-scroll-target="#squared-terms"><span class="header-section-number">4</span> 2. Squared terms</a></li>
-  <li><a href="#categorical-variables" id="toc-categorical-variables" class="nav-link" data-scroll-target="#categorical-variables"><span class="header-section-number">5</span> 3. Categorical variables</a></li>
-  <li><a href="#interactions" id="toc-interactions" class="nav-link" data-scroll-target="#interactions"><span class="header-section-number">6</span> 4. Interactions</a></li>
-  <li><a href="#fixed-effects" id="toc-fixed-effects" class="nav-link" data-scroll-target="#fixed-effects"><span class="header-section-number">7</span> 5. Fixed effects</a>
+  <li><a href="#squared-terms" id="toc-squared-terms" class="nav-link" data-scroll-target="#squared-terms"><span class="header-section-number">4</span> Squared terms</a></li>
+  <li><a href="#categorical-variables" id="toc-categorical-variables" class="nav-link" data-scroll-target="#categorical-variables"><span class="header-section-number">5</span> Categorical variables</a></li>
+  <li><a href="#interactions" id="toc-interactions" class="nav-link" data-scroll-target="#interactions"><span class="header-section-number">6</span> Interactions</a></li>
+  <li><a href="#fixed-effects" id="toc-fixed-effects" class="nav-link" data-scroll-target="#fixed-effects"><span class="header-section-number">7</span> Fixed effects</a>
   <ul class="collapse">
   <li><a href="#fixed-effects-and-cross-validation" id="toc-fixed-effects-and-cross-validation" class="nav-link" data-scroll-target="#fixed-effects-and-cross-validation"><span class="header-section-number">7.1</span> Fixed effects and cross-validation</a></li>
   </ul></li>
@@ -311,7 +311,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="fu">cv_rmse</span>(f0, tracts)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="log-transformations" class="level1" data-number="3">
-<h1 data-number="3"><span class="header-section-number">3</span> 1. Log transformations</h1>
+<h1 data-number="3"><span class="header-section-number">3</span> Log transformations</h1>
 <section id="why-log" class="level2" data-number="3.1">
 <h2 data-number="3.1" class="anchored" data-anchor-id="why-log"><span class="header-section-number">3.1</span> Why log?</h2>
 <p>Income and rent can be right-skewed. A few very high values can pull a straight-line fit. A log compresses the upper tail and makes equal <strong>percentage</strong> changes comparable distances. For example, moving from $20,000 to $40,000 may matter more than moving from $180,000 to $200,000, even though both changes are $20,000.</p>
@@ -372,7 +372,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 </section>
 <section id="squared-terms" class="level1" data-number="4">
-<h1 data-number="4"><span class="header-section-number">4</span> 2. Squared terms</h1>
+<h1 data-number="4"><span class="header-section-number">4</span> Squared terms</h1>
 <p>If a scatterplot’s smooth curve bends away from a straight line, a linear term may be missing structure. Add a squared term to let the relationship curve:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>f_sq <span class="ot">&lt;-</span> rent <span class="sc">~</span> <span class="fu">log</span>(income) <span class="sc">+</span> pct_renter <span class="sc">+</span> bldg_age <span class="sc">+</span></span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">I</span>(bldg_age<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> dist_ch_mi</span>
@@ -386,7 +386,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>Check that the turning point is inside the observed data range before describing it as a real turn. A parabola can make implausible predictions outside the training range. The lecture also notes that the building-age data pile up at the oldest ages because the Census groups structures built before 1940 as “1939 or earlier”; this is a data limit, not necessarily a real-world pattern.</p>
 </section>
 <section id="categorical-variables" class="level1" data-number="5">
-<h1 data-number="5"><span class="header-section-number">5</span> 3. Categorical variables</h1>
+<h1 data-number="5"><span class="header-section-number">5</span> Categorical variables</h1>
 <p>Use a category when a variable is already a group (such as zoning or housing type), or when a numeric relationship appears to change in jumps rather than smoothly. Create groups with <code>case_when()</code> when you want explicit rules, or <code>cut()</code> when you have breakpoints:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>tracts <span class="ot">&lt;-</span> tracts <span class="sc">%&gt;%</span></span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
@@ -407,7 +407,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>Binning a continuous predictor discards detail: tracts 2.1 and 4.9 miles from City Hall become the same category in this example. Bins can help when the relationship has genuine jumps, but can hurt when it is smooth. Compare with CV RMSE.</p>
 </section>
 <section id="interactions" class="level1" data-number="6">
-<h1 data-number="6"><span class="header-section-number">6</span> 4. Interactions</h1>
+<h1 data-number="6"><span class="header-section-number">6</span> Interactions</h1>
 <p>A categorical predictor can shift group lines up or down. An interaction lets the slope vary by group. If income-versus-rent lines are not parallel across distance rings, an interaction may be useful:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>f_int <span class="ot">&lt;-</span> rent <span class="sc">~</span> <span class="fu">log</span>(income) <span class="sc">*</span> ring <span class="sc">+</span> pct_renter <span class="sc">+</span></span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  bldg_age <span class="sc">+</span> <span class="fu">I</span>(bldg_age<span class="sc">^</span><span class="dv">2</span>)</span>
@@ -416,7 +416,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>Use interactions when there is a substantive reason. Each additional group-specific slope costs more coefficients to estimate from the same limited sample. Avoid crossing every variable with every other variable without a reason.</p>
 </section>
 <section id="fixed-effects" class="level1" data-number="7">
-<h1 data-number="7"><span class="header-section-number">7</span> 5. Fixed effects</h1>
+<h1 data-number="7"><span class="header-section-number">7</span> Fixed effects</h1>
 <p>A <strong>fixed effect (FE)</strong> is a categorical predictor for a group, often a place. Place fixed effects can absorb unmeasured attributes that are constant within each place, such as reputation, school catchments, transit access, or history. They tell you <strong>where</strong> adjusted values differ, not <strong>why</strong>.</p>
 <p>The lecture assigns Philadelphia tracts to the planning district containing the largest share of each tract’s area (<code>largest = TRUE</code>), then fits district as a factor:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>tracts <span class="ot">&lt;-</span> tracts <span class="sc">%&gt;%</span></span>
@@ -1082,7 +1082,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb14-70"><a href="#cb14-70" aria-hidden="true" tabindex="-1"></a><span class="fu">cv_rmse</span>(f0, tracts)</span>
 <span id="cb14-71"><a href="#cb14-71" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb14-72"><a href="#cb14-72" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-73"><a href="#cb14-73" aria-hidden="true" tabindex="-1"></a><span class="fu"># 1. Log transformations</span></span>
+<span id="cb14-73"><a href="#cb14-73" aria-hidden="true" tabindex="-1"></a><span class="fu"># Log transformations</span></span>
 <span id="cb14-74"><a href="#cb14-74" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb14-75"><a href="#cb14-75" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why log?</span></span>
 <span id="cb14-76"><a href="#cb14-76" aria-hidden="true" tabindex="-1"></a></span>
@@ -1131,7 +1131,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb14-119"><a href="#cb14-119" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb14-120"><a href="#cb14-120" aria-hidden="true" tabindex="-1"></a>**RMSE trap:** RMSE must be on the same outcome scale to compare models. A residual RMSE from a model of <span class="in">`log(rent)`</span> is in log-dollars; it cannot be compared with the baseline RMSE in dollars. During cross-validation, exponentiate predictions before calculating RMSE. Directly exponentiating a predicted log often estimates closer to the median than the mean, so it can underpredict somewhat; the lecture treats this simple back-transformation as adequate for the assignment.</span>
 <span id="cb14-121"><a href="#cb14-121" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-122"><a href="#cb14-122" aria-hidden="true" tabindex="-1"></a><span class="fu"># 2. Squared terms</span></span>
+<span id="cb14-122"><a href="#cb14-122" aria-hidden="true" tabindex="-1"></a><span class="fu"># Squared terms</span></span>
 <span id="cb14-123"><a href="#cb14-123" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb14-124"><a href="#cb14-124" aria-hidden="true" tabindex="-1"></a>If a scatterplot’s smooth curve bends away from a straight line, a linear term may be missing structure. Add a squared term to let the relationship curve:</span>
 <span id="cb14-125"><a href="#cb14-125" aria-hidden="true" tabindex="-1"></a></span>
@@ -1154,7 +1154,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb14-142"><a href="#cb14-142" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb14-143"><a href="#cb14-143" aria-hidden="true" tabindex="-1"></a>Check that the turning point is inside the observed data range before describing it as a real turn. A parabola can make implausible predictions outside the training range. The lecture also notes that the building-age data pile up at the oldest ages because the Census groups structures built before 1940 as “1939 or earlier”; this is a data limit, not necessarily a real-world pattern.</span>
 <span id="cb14-144"><a href="#cb14-144" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-145"><a href="#cb14-145" aria-hidden="true" tabindex="-1"></a><span class="fu"># 3. Categorical variables</span></span>
+<span id="cb14-145"><a href="#cb14-145" aria-hidden="true" tabindex="-1"></a><span class="fu"># Categorical variables</span></span>
 <span id="cb14-146"><a href="#cb14-146" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb14-147"><a href="#cb14-147" aria-hidden="true" tabindex="-1"></a>Use a category when a variable is already a group (such as zoning or housing type), or when a numeric relationship appears to change in jumps rather than smoothly. Create groups with <span class="in">`case_when()`</span> when you want explicit rules, or <span class="in">`cut()`</span> when you have breakpoints:</span>
 <span id="cb14-148"><a href="#cb14-148" aria-hidden="true" tabindex="-1"></a></span>
@@ -1188,7 +1188,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb14-176"><a href="#cb14-176" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb14-177"><a href="#cb14-177" aria-hidden="true" tabindex="-1"></a>Binning a continuous predictor discards detail: tracts 2.1 and 4.9 miles from City Hall become the same category in this example. Bins can help when the relationship has genuine jumps, but can hurt when it is smooth. Compare with CV RMSE.</span>
 <span id="cb14-178"><a href="#cb14-178" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-179"><a href="#cb14-179" aria-hidden="true" tabindex="-1"></a><span class="fu"># 4. Interactions</span></span>
+<span id="cb14-179"><a href="#cb14-179" aria-hidden="true" tabindex="-1"></a><span class="fu"># Interactions</span></span>
 <span id="cb14-180"><a href="#cb14-180" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb14-181"><a href="#cb14-181" aria-hidden="true" tabindex="-1"></a>A categorical predictor can shift group lines up or down. An interaction lets the slope vary by group. If income-versus-rent lines are not parallel across distance rings, an interaction may be useful:</span>
 <span id="cb14-182"><a href="#cb14-182" aria-hidden="true" tabindex="-1"></a></span>
@@ -1202,7 +1202,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb14-190"><a href="#cb14-190" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb14-191"><a href="#cb14-191" aria-hidden="true" tabindex="-1"></a>Use interactions when there is a substantive reason. Each additional group-specific slope costs more coefficients to estimate from the same limited sample. Avoid crossing every variable with every other variable without a reason.</span>
 <span id="cb14-192"><a href="#cb14-192" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-193"><a href="#cb14-193" aria-hidden="true" tabindex="-1"></a><span class="fu"># 5. Fixed effects</span></span>
+<span id="cb14-193"><a href="#cb14-193" aria-hidden="true" tabindex="-1"></a><span class="fu"># Fixed effects</span></span>
 <span id="cb14-194"><a href="#cb14-194" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb14-195"><a href="#cb14-195" aria-hidden="true" tabindex="-1"></a>A **fixed effect (FE)** is a categorical predictor for a group, often a place. Place fixed effects can absorb unmeasured attributes that are constant within each place, such as reputation, school catchments, transit access, or history. They tell you **where** adjusted values differ, not **why**.</span>
 <span id="cb14-196"><a href="#cb14-196" aria-hidden="true" tabindex="-1"></a></span>

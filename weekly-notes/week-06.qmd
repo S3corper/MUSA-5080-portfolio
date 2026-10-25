@@ -70,7 +70,7 @@ f0 <- rent ~ income + pct_renter + bldg_age + dist_ch_mi
 cv_rmse(f0, tracts)
 ```
 
-# 1. Log transformations
+# Log transformations
 
 ## Why log?
 
@@ -119,7 +119,7 @@ In a **log–log** model (`log(y) ~ log(x)`), `β` is an elasticity: a 1% increa
 
 **RMSE trap:** RMSE must be on the same outcome scale to compare models. A residual RMSE from a model of `log(rent)` is in log-dollars; it cannot be compared with the baseline RMSE in dollars. During cross-validation, exponentiate predictions before calculating RMSE. Directly exponentiating a predicted log often estimates closer to the median than the mean, so it can underpredict somewhat; the lecture treats this simple back-transformation as adequate for the assignment.
 
-# 2. Squared terms
+# Squared terms
 
 If a scatterplot’s smooth curve bends away from a straight line, a linear term may be missing structure. Add a squared term to let the relationship curve:
 
@@ -142,7 +142,7 @@ range(tracts$bldg_age)
 
 Check that the turning point is inside the observed data range before describing it as a real turn. A parabola can make implausible predictions outside the training range. The lecture also notes that the building-age data pile up at the oldest ages because the Census groups structures built before 1940 as “1939 or earlier”; this is a data limit, not necessarily a real-world pattern.
 
-# 3. Categorical variables
+# Categorical variables
 
 Use a category when a variable is already a group (such as zoning or housing type), or when a numeric relationship appears to change in jumps rather than smoothly. Create groups with `case_when()` when you want explicit rules, or `cut()` when you have breakpoints:
 
@@ -176,7 +176,7 @@ tracts_r <- tracts %>% mutate(ring = relevel(ring, ref = "Outer"))
 
 Binning a continuous predictor discards detail: tracts 2.1 and 4.9 miles from City Hall become the same category in this example. Bins can help when the relationship has genuine jumps, but can hurt when it is smooth. Compare with CV RMSE.
 
-# 4. Interactions
+# Interactions
 
 A categorical predictor can shift group lines up or down. An interaction lets the slope vary by group. If income-versus-rent lines are not parallel across distance rings, an interaction may be useful:
 
@@ -190,7 +190,7 @@ The `*` expands to the main effects and the interaction (`a * b` gives `a + b + 
 
 Use interactions when there is a substantive reason. Each additional group-specific slope costs more coefficients to estimate from the same limited sample. Avoid crossing every variable with every other variable without a reason.
 
-# 5. Fixed effects
+# Fixed effects
 
 A **fixed effect (FE)** is a categorical predictor for a group, often a place. Place fixed effects can absorb unmeasured attributes that are constant within each place, such as reputation, school catchments, transit access, or history. They tell you **where** adjusted values differ, not **why**.
 
