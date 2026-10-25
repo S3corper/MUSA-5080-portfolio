@@ -1,13 +1,120 @@
-/* Keep the reading outline compact on every page that has a table of contents. */
+/* Match the Week 07 reference's reading rhythm and heading scale.
+   Quarto uses a 17px root: desktop headings are 34px / 28.05px / 24.65px. */
+body {
+  line-height: 1.7;
+}
+
+main.content h1 {
+  font-size: calc(1.325rem + 0.9vw);
+}
+
+main.content h2 {
+  font-size: calc(1.29rem + 0.48vw);
+}
+
+main.content h3 {
+  font-size: calc(1.27rem + 0.24vw);
+}
+
+main.content :is(h1, h2, h3) {
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: break-word;
+}
+
+@media (min-width: 1200px) {
+  main.content h1 { font-size: 2rem; }
+  main.content h2 { font-size: 1.65rem; }
+  main.content h3 { font-size: 1.45rem; }
+}
+
+/* Set the links' own line-height: Quarto overrides the enclosing list. */
 #TOC,
+#TOC ul,
 #TOC a {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
 }
 
 #TOC > h2 {
   font-size: 0.8rem;
+  line-height: 1.35;
+  margin-bottom: 0.35rem;
 }
 
 #TOC ul {
-  line-height: 1.1;
+  line-height: 1.35;
+}
+
+#TOC > ul {
+  margin-left: 0;
+}
+
+#TOC ul li a {
+  line-height: 1.35;
+  padding-top: 0.15rem;
+  padding-bottom: 0.15rem;
+  overflow-wrap: break-word;
+}
+
+/* Keep dates in a compact, consistent column and use the full reading width. */
+.quarto-listing-container-default {
+  margin-right: 0;
+}
+
+.quarto-listing-default div.quarto-post {
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+.quarto-listing-default div.quarto-post .metadata {
+  flex: 0 0 7rem;
+  margin-top: 0.2rem;
+  line-height: 1.5;
+}
+
+.quarto-listing-default div.quarto-post .body {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.quarto-listing-default .listing-description {
+  margin-top: 0.4rem;
+  line-height: 1.6;
+}
+
+/* Keep long links, code snippets, tables, and equations inside the page. */
+main.content :is(p, li, td, th) {
+  overflow-wrap: anywhere;
+}
+
+main.content :not(pre) > code {
+  white-space: normal;
+}
+
+main.content mjx-container[display="true"] {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: 0.25rem;
+}
+
+@media (max-width: 991.98px) {
+  main.content table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
+
+/* Preserve Quarto's stacked listing layout on small screens. */
+@media (max-width: 767.98px) {
+  .quarto-listing-default div.quarto-post {
+    gap: 0.5rem;
+  }
+
+  .quarto-listing-default div.quarto-post .metadata {
+    flex-basis: auto;
+    margin-top: 0;
+    padding-bottom: 0;
+  }
 }
