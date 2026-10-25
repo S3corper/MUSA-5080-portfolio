@@ -4,6 +4,12 @@ body {
   line-height: 1.7;
 }
 
+/* Keep the site header as compact as the reference's roughly 65px bar. */
+#quarto-header .navbar {
+  padding-block: 0.6rem;
+  line-height: 1.5;
+}
+
 main.content h1 {
   font-size: calc(1.325rem + 0.9vw);
 }
@@ -28,21 +34,40 @@ main.content :is(h1, h2, h3) {
   main.content h3 { font-size: 1.45rem; }
 }
 
+/* Some notes start their sections at H1. Give those article headings the
+   same visual hierarchy as Week 07 without changing their text or anchors. */
+main.content h1:not(.title) {
+  font-size: calc(1.29rem + 0.48vw);
+}
+
+main.content section.level1 section.level2 > h2 {
+  font-size: calc(1.27rem + 0.24vw);
+}
+
+main.content section.level1 section.level3 > h3 {
+  font-size: 1.25rem;
+}
+
+@media (min-width: 1200px) {
+  main.content h1:not(.title) { font-size: 1.65rem; }
+  main.content section.level1 section.level2 > h2 { font-size: 1.45rem; }
+}
+
 /* Set the links' own line-height: Quarto overrides the enclosing list. */
 #TOC,
 #TOC ul,
 #TOC a {
-  font-size: 0.75rem;
+  font-size: 0.65rem;
 }
 
 #TOC > h2 {
-  font-size: 0.8rem;
-  line-height: 1.35;
-  margin-bottom: 0.35rem;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  margin-bottom: 0.25rem;
 }
 
 #TOC ul {
-  line-height: 1.35;
+  line-height: 1.2;
 }
 
 #TOC > ul {
@@ -50,9 +75,9 @@ main.content :is(h1, h2, h3) {
 }
 
 #TOC ul li a {
-  line-height: 1.35;
-  padding-top: 0.15rem;
-  padding-bottom: 0.15rem;
+  line-height: 1.2;
+  padding-top: 0.08rem;
+  padding-bottom: 0.08rem;
   overflow-wrap: break-word;
 }
 
