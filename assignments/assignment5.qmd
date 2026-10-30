@@ -11,8 +11,11 @@ format:
 execute:
   warning: false
   message: false
-  freeze: false
-  cache: false
+  freeze: auto
+  cache: true
+knitr:
+  opts_chunk:
+    cache.lazy: false
 ---
 
 ```{=html}
@@ -83,15 +86,24 @@ Load the packages and set display options. Modeling functions are defined alongs
 
 ```{r}
 #| label: setup
+#| cache: false
 library(tidyverse)
 library(tidycensus)
 library(sf)
 library(spdep)
 options(scipen = 999)
+# Invalidate downstream caches when code or input data changes, while allowing
+# prose-only edits to reuse the model results. Setup always restores packages.
+knitr::opts_chunk$set(cache.extra = list(
+  code = knitr::knit_code$get(),
+  data = tools::md5sum(c("data/assignment5/chicago_train.csv",
+                        "data/assignment5/chicago_test.csv"))
+))
 ```
 
 ```{r}
 #| label: formatting
+#| cache: false
 money <- scales::label_dollar(accuracy = 1)
 pct <- scales::label_percent(accuracy = 0.1)
 theme_set(theme_minimal(base_size = 12))
@@ -412,7 +424,11 @@ Start with a structure-only baseline. Then add features in steps you can learn f
 
 ```{r}
 #| label: download-sources
-acs_tracts <- get_acs(
+acs_cache <- "data/assignment5/acs_tracts_income_2023.rds"
+if (file.exists(acs_cache)) {
+  acs_tracts <- readRDS(acs_cache)
+} else {
+  acs_tracts <- get_acs(
   geography = "tract",
   state = "IL",
   county = "Cook",
@@ -424,6 +440,8 @@ acs_tracts <- get_acs(
   progress_bar = FALSE
 ) %>%
   st_transform(3435)
+  saveRDS(acs_tracts, acs_cache)
+}
 
 income <- acs_tracts %>%
   st_drop_geometry() %>%

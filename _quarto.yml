@@ -4,6 +4,8 @@ project:
   execute-dir: project
   render:
     - "*.qmd"
+    - "assignments/*.qmd"
+    - "weekly-notes/*.qmd"
     - "!practice/"
 
 website:
