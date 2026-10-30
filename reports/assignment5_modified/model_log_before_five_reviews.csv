@@ -1,0 +1,25 @@
+model,added,cv_rmse,moran_i,notes
+M0_structure,House attributes only; benchmark,284790.4821753518,0.3377825628440872,"Same grouped folds, development sample; pooled dollar RMSE"
+M1_curved_time,"Size/age curvature, log lot area, timing and missingness",266223.0538583587,0.3709522178176767,"Same grouped folds, development sample; pooled dollar RMSE"
+M2_log_size,Alternative: log size instead of quadratic size,307256.2214339413,0.371441713370007,"Same grouped folds, development sample; pooled dollar RMSE"
+M3_downtown,Straight-line distance to the Loop,258364.71523078496,0.3834102619593088,"Same grouped folds, development sample; pooled dollar RMSE"
+M4_distance_curve,Allow downtown distance to bend,256566.3555384903,0.3865961780874721,"Same grouped folds, development sample; pooled dollar RMSE"
+M5_rings,Preset 3/8-mile distance categories,260298.1044062589,0.3838328685300261,"Same grouped folds, development sample; pooled dollar RMSE"
+M6_spatial_surface,Quadratic east/north spatial trend,234828.44051826568,0.33467093835010303,"Same grouped folds, development sample; pooled dollar RMSE"
+M7_cubic_surface,Test a more flexible cubic spatial trend,225139.3675203617,0.30702113143314974,"Same grouped folds, development sample; pooled dollar RMSE"
+M8_tract_effects,2023 Census tract intercepts; sparse tracts pooled,232553.83506158154,0.25169504554535005,"Same grouped folds, development sample; pooled dollar RMSE"
+M9_tract_size_ring,Let size slopes vary by distance ring,219181.44817782842,0.23232063408034487,"Same grouped folds, development sample; pooled dollar RMSE"
+M10_tract_surface,"Combine tract intercepts, size interactions and spatial surface",202544.44245337238,0.16257293236869796,"Same grouped folds, development sample; pooled dollar RMSE"
+M11_grid_effects,Alternative 2-mile grid intercepts,195542.35248619958,0.15641182062191444,"Same grouped folds, development sample; pooled dollar RMSE"
+M0_structure_nonnegative,Same formula as M0_structure ; constrain predicted values to >= $0,284360.8440083796,0.3387085110606495,Domain constraint; all 12 alternatives evaluated on the same held-out predictions
+M1_curved_time_nonnegative,Same formula as M1_curved_time ; constrain predicted values to >= $0,266218.4555379626,0.3709641205998625,Domain constraint; all 12 alternatives evaluated on the same held-out predictions
+M2_log_size_nonnegative,Same formula as M2_log_size ; constrain predicted values to >= $0,306796.27576213755,0.3726372294405435,Domain constraint; all 12 alternatives evaluated on the same held-out predictions
+M3_downtown_nonnegative,Same formula as M3_downtown ; constrain predicted values to >= $0,258339.96444610544,0.38342868294588284,Domain constraint; all 12 alternatives evaluated on the same held-out predictions
+M4_distance_curve_nonnegative,Same formula as M4_distance_curve ; constrain predicted values to >= $0,256563.2370562232,0.38660023616918193,Domain constraint; all 12 alternatives evaluated on the same held-out predictions
+M5_rings_nonnegative,Same formula as M5_rings ; constrain predicted values to >= $0,260298.1044062589,0.3838328685300261,Domain constraint; all 12 alternatives evaluated on the same held-out predictions
+M6_spatial_surface_nonnegative,Same formula as M6_spatial_surface ; constrain predicted values to >= $0,234767.50602445297,0.3345018402848311,Domain constraint; all 12 alternatives evaluated on the same held-out predictions
+M7_cubic_surface_nonnegative,Same formula as M7_cubic_surface ; constrain predicted values to >= $0,225032.08773415792,0.30665462048194364,Domain constraint; all 12 alternatives evaluated on the same held-out predictions
+M8_tract_effects_nonnegative,Same formula as M8_tract_effects ; constrain predicted values to >= $0,232527.60168868597,0.25178583957809114,Domain constraint; all 12 alternatives evaluated on the same held-out predictions
+M9_tract_size_ring_nonnegative,Same formula as M9_tract_size_ring ; constrain predicted values to >= $0,219128.3060644912,0.232483732203833,Domain constraint; all 12 alternatives evaluated on the same held-out predictions
+M10_tract_surface_nonnegative,Same formula as M10_tract_surface ; constrain predicted values to >= $0,201903.8877940371,0.1601641656904612,Domain constraint; all 12 alternatives evaluated on the same held-out predictions
+M11_grid_effects_nonnegative,Same formula as M11_grid_effects ; constrain predicted values to >= $0,195488.29752986485,0.1564031507751214,Domain constraint; all 12 alternatives evaluated on the same held-out predictions

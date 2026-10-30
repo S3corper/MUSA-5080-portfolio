@@ -1,0 +1,13 @@
+model,added,cv_rmse,moran_i,notes
+House_only,Benchmark: assess prediction from house characteristics alone,282173.320809445,0.37616813591629195,Same grouped folds; median filling inside fitting folds; raw dollar predictions
+Curved_and_time,Test curved size/age relationships and sale timing,267223.4007738598,0.41244999322107856,Same grouped folds; median filling inside fitting folds; raw dollar predictions
+Log_size,Test an alternative shape for the size relationship,303759.2346669376,0.4093144206194294,Same grouped folds; median filling inside fitting folds; raw dollar predictions
+Downtown_distance,Test whether downtown proximity improves prediction,259594.57882571025,0.4247220023093409,Same grouped folds; median filling inside fitting folds; raw dollar predictions
+Squared_distance,Allow the downtown-distance relationship to bend,257895.45497402851,0.4273475737290517,Same grouped folds; median filling inside fitting folds; raw dollar predictions
+Distance_rings,Test broad location categories instead of continuous distance,261488.01341552215,0.4245724373952629,Same grouped folds; median filling inside fitting folds; raw dollar predictions
+Size_by_ring,Test whether the value associated with size differs by ring,251094.58092902327,0.4157112468321101,Same grouped folds; median filling inside fitting folds; raw dollar predictions
+Tract_effects,Account for local price-level differences beyond rings,203501.60680728836,0.21112080950194406,Same grouped folds; median filling inside fitting folds; raw dollar predictions
+Tract_linear_size,Remove squared size; check whether its curvature drives poor small-house predictions,206570.56142688732,0.20359589393808972,Same grouped folds; median filling inside fitting folds; raw dollar predictions
+Tract_log_size,Use log size with tract intercepts and size-by-ring interaction,224566.07864164686,0.19868866189916864,Same grouped folds; median filling inside fitting folds; raw dollar predictions
+Tract_size_slopes,Allow the building-area slope to differ by tract,198467.57089585267,0.18616528184838438,Same grouped folds; median filling inside fitting folds; raw dollar predictions
+Age_by_ring,Let the age slope differ across rings; investigate older-house errors,198334.52817962962,0.18059848197022504,Same grouped folds; median filling inside fitting folds; raw dollar predictions

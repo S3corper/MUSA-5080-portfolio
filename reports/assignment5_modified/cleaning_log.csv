@@ -1,0 +1,4 @@
+stage,remaining,removed_at_step
+Original training rows,23200,0
+Exclude multi-parcel sales,21968,1232
+Exclude missing/nonpositive prices,21968,0

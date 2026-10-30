@@ -1,0 +1,142 @@
+body {
+  line-height: 1.7;
+}
+
+#quarto-header .navbar {
+  padding-block: 0.6rem;
+  line-height: 0.5;
+}
+
+main.content h1 {
+  font-size: calc(1.325rem + 0.9vw);
+}
+
+main.content h2 {
+  font-size: calc(1.29rem + 0.48vw);
+}
+
+main.content h3 {
+  font-size: calc(1.27rem + 0.24vw);
+}
+
+main.content :is(h1, h2, h3) {
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: break-word;
+}
+
+@media (min-width: 1200px) {
+  main.content h1 { font-size: 2rem; }
+  main.content h2 { font-size: 1.65rem; }
+  main.content h3 { font-size: 1.45rem; }
+}
+
+/* Some notes start their sections at H1. Give those article headings the
+   same visual hierarchy as Week 07 without changing their text or anchors. */
+main.content h1:not(.title) {
+  font-size: calc(1.29rem + 0.48vw);
+}
+
+main.content section.level1 section.level2 > h2 {
+  font-size: calc(1.27rem + 0.24vw);
+}
+
+main.content section.level1 section.level3 > h3 {
+  font-size: 1.25rem;
+}
+
+@media (min-width: 1200px) {
+  main.content h1:not(.title) { font-size: 1.65rem; }
+  main.content section.level1 section.level2 > h2 { font-size: 1.45rem; }
+}
+
+/* Set the links' own line-height: Quarto overrides the enclosing list. */
+#TOC,
+#TOC ul,
+#TOC a {
+  font-size: 0.65rem;
+}
+
+#TOC > h2 {
+  font-size: 0.7rem;
+  line-height: 1.2;
+  margin-bottom: 0.25rem;
+}
+
+#TOC ul {
+  line-height: 1.2;
+}
+
+#TOC > ul {
+  margin-left: 0;
+}
+
+#TOC ul li a {
+  line-height: 1.2;
+  padding-top: 0.08rem;
+  padding-bottom: 0.08rem;
+  overflow-wrap: break-word;
+}
+
+/* Keep dates in a compact, consistent column and use the full reading width. */
+.quarto-listing-container-default {
+  margin-right: 0;
+}
+
+.quarto-listing-default div.quarto-post {
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+.quarto-listing-default div.quarto-post .metadata {
+  flex: 0 0 7rem;
+  margin-top: 0.2rem;
+  line-height: 1.5;
+}
+
+.quarto-listing-default div.quarto-post .body {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.quarto-listing-default .listing-description {
+  margin-top: 0.4rem;
+  line-height: 1.6;
+}
+
+/* Keep long links, code snippets, tables, and equations inside the page. */
+main.content :is(p, li, td, th) {
+  overflow-wrap: anywhere;
+}
+
+main.content :not(pre) > code {
+  white-space: normal;
+}
+
+main.content mjx-container[display="true"] {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: 0.25rem;
+}
+
+@media (max-width: 991.98px) {
+  main.content table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
+
+/* Preserve Quarto's stacked listing layout on small screens. */
+@media (max-width: 767.98px) {
+  .quarto-listing-default div.quarto-post {
+    gap: 0.5rem;
+  }
+
+  .quarto-listing-default div.quarto-post .metadata {
+    flex-basis: auto;
+    margin-top: 0;
+    padding-bottom: 0;
+  }
+}

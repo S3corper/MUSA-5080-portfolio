@@ -2,6 +2,9 @@ project:
   type: website
   output-dir: docs
   execute-dir: project
+  render:
+    - "*.qmd"
+    - "!practice/"
 
 website:
   title: "Leo Leung - MUSA 5080 Portfolio"        # <-- CHANGE THIS

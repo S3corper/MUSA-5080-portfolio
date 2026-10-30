@@ -1,0 +1,1439 @@
+---
+title: "Assignment 5: House Price Prediction, Chicago"
+subtitle: "MUSA 5080 · Team assignment"
+author: "Team: Frederick Abalo, Emmanuel Sampson, Yogi Patnaik, Leo Leung"
+date: 10-29-2026
+format:
+  html:
+    toc: true
+    code-fold: true
+    df-print: kable
+execute:
+  warning: false
+  message: false
+  freeze: false
+  cache: false
+---
+
+```{=html}
+<style>
+main .cell-output-display { overflow-x: auto; }
+main table { width: 100%; font-size: 0.9rem; line-height: 1.45; }
+main table th, main table td { overflow-wrap: normal; word-break: normal; }
+main table td[style*="text-align: right"] { white-space: nowrap; }
+main details { overflow-x: auto; }
+</style>
+```
+
+## The assignment
+
+In class we built a house price model for Philadelphia. Now your team does it for a city you haven't modeled: **Chicago**.
+
+The Cook County Assessor's Office has to value every home in the county, including the vast majority that didn't sell this year. Assessments drive property tax bills. When they're wrong in a systematic way, some households pay more than their share. A 2017 *Chicago Tribune* investigation, "The Tax Divide," found exactly that in Cook County: lower-value homes were assessed at higher shares of their worth than expensive ones.
+
+Build a model that predicts **single-family sale prices in Chicago, 2023–2025**, using only the tools from this course. The file contains **only features of the house itself**. Everything about location is yours to build.
+
+### A real test
+
+| File | What's in it |
+|---|---|
+| `chicago_train.csv` | About 80% of the houses, **with** sale prices |
+| `chicago_test.csv` | The other 20%, **without** sale prices. You predict them; we score you. |
+
+The test houses were held out by house, not by sale, so a house that sold twice is entirely on one side. Your CV RMSE is your estimate. Your test RMSE is the truth. **If they're far apart, something leaked.**
+
+**Due:** Friday, October 30. All teammates renders the file on their portfolio and every member submits that link on Canvas. One teammate uploads `team_XX_predictions.csv`.
+
+**Individual accountability:** Q7 on October 30 asks each of you about *this* model: which features you used and why, your CV and test RMSE, and where the model fails worst. Make sure everyone can explain all of it.
+
+### Rules
+
+::: {.callout-important}
+## 1. Clean training rows once, in Part 1. Never drop test rows.
+You must predict every test house, so fill NAs in a feature rather than filtering.
+
+## 2. Stay inside the time window
+Open data from 2023–2025 only.
+
+## 3. No leakage
+Nothing built from sale prices. *Would the Assessor have this number for a house that didn't sell?*
+
+## 4. The outcome stays in dollars
+Transform predictors, not `sale_price`.
+
+## 5. No prices from the test fold or the future
+No features built from other houses' sale prices.
+:::
+
+### Please include in your final rendered qmd for this assignment:
+
+| Requirement | What to include |
+|---|---|
+| **Model log** | Every model you tried, in order, with CV RMSE and Moran's I. Each row has a note saying why you tried it. |
+| **Features** | Incorporate the feature engineering tricks - including the spatial ones covered these past few weeks. |
+| **Diagnostics** | Residual maps for your baseline and final model, and what changed. |
+| **Error analysis** | Where your final model fails worst, and whose homes it over-values (Part 4). |
+| **Reasoning** | Choices justified by evidence from your own analysis. |
+
+---
+
+## Part 0: Setup (provided)
+
+Load the packages and set display options. Modeling functions are defined alongside their use in Part 2.
+
+```{r}
+#| label: setup
+library(tidyverse)
+library(tidycensus)
+library(sf)
+library(spdep)
+options(scipen = 999)
+```
+
+```{r}
+#| label: formatting
+money <- scales::label_dollar(accuracy = 1)
+pct <- scales::label_percent(accuracy = 0.1)
+theme_set(theme_minimal(base_size = 12))
+dir.create("reports/assignment5", recursive = TRUE, showWarnings = FALSE)
+```
+
+### Load both files together (provided)
+
+Build every feature on `all_sales`, so training and test houses get identical features. Split off `train` again whenever you add something.
+
+```{r}
+#| label: load
+raw_train <- read_csv("data/assignment5/chicago_train.csv", show_col_types = FALSE)
+raw_test <- read_csv("data/assignment5/chicago_test.csv", show_col_types = FALSE)
+
+all_sales <- bind_rows(
+  raw_train %>% mutate(split = "train"),
+  raw_test %>% mutate(split = "test")
+) %>%
+  st_as_sf(coords = c("lon", "lat"), crs = 4326, remove = FALSE) %>%
+  st_transform(3435)            # Illinois East State Plane, feet
+
+all_sales %>% st_drop_geometry() %>% count(split)
+```
+
+Useful sources: the [Chicago Data Portal](https://data.cityofchicago.org) (find a dataset's ID under its API button), the Census via `tidycensus`, and Cook County's open data.
+
+---
+
+## Part 1: Clean and explore
+
+Decide which training sales are market sales. Record each rule, why, and how many it removed. Then explore: at least four plots, including a map of price.
+
+```{r}
+#| label: part-1
+#| output: false
+glimpse(all_sales)
+```
+
+```{r}
+#| label: input-preview
+all_sales %>%
+  st_drop_geometry() %>%
+  select(id, split, sale_date, sale_price, building_000sf, building_age,
+         num_bedrooms, num_full_baths) %>%
+  slice_head(n = 6) %>%
+  mutate(sale_price = money(sale_price)) %>%
+  knitr::kable(
+    digits = 3,
+    col.names = c("ID", "Split", "Sale date", "Price", "Area (1,000 sq ft)",
+                  "Age", "Bedrooms", "Full baths"),
+    align = c("r", "l", "l", "r", "r", "r", "r", "r"),
+    caption = "First six input sales: selected characteristics"
+  )
+```
+
+```{r}
+#| label: inspection-summary
+#| output: false
+all_sales %>% st_drop_geometry() %>% filter(split == "train") %>% summary()
+```
+
+```{r}
+#| label: price-summary
+all_sales %>%
+  st_drop_geometry() %>%
+  filter(split == "train") %>%
+  summarise(
+    Minimum = min(sale_price),
+    Median = median(sale_price),
+    Mean = mean(sale_price),
+    Maximum = max(sale_price)
+  ) %>%
+  pivot_longer(everything(), names_to = "Statistic", values_to = "Price") %>%
+  mutate(Price = money(Price)) %>%
+  knitr::kable(align = c("l", "r"), caption = "Training prices before cleaning")
+```
+### Inspect unusually small buildings
+```{r}
+all_sales %>%
+  st_drop_geometry() %>%
+  filter(split == "train") %>%
+  select(id, sale_price, building_000sf, num_bedrooms,
+         num_full_baths, lotsize_acre, building_age, is_multisale) %>%
+  arrange(building_000sf) %>%
+  slice_head(n = 10) %>%
+  mutate(sale_price = money(sale_price)) %>%
+  knitr::kable(digits = 3,
+    col.names = c("ID", "Price", "Area (1,000 sq ft)", "Bedrooms",
+                  "Full baths", "Lot (acres)", "Age", "Multi-parcel"),
+    align = c("r", "r", "r", "r", "r", "r", "r", "r"),
+    caption = "Ten smallest reported building areas")
+```
+Some of the smallest buildings have room counts that seem high for their size. One record reports 246 square feet and a $700,000 sale price. We flagged it for further checking rather than removing it. We interpret `building_000sf` as thousands of square feet based on the column name, but the supplied files do not explain whether it includes basements or other structures.
+
+
+```{r}
+all_sales %>%
+  st_drop_geometry() %>%
+  filter(split == "train") %>%
+  select(id, sale_price, building_000sf, num_bedrooms,
+         num_full_baths, building_age, is_multisale) %>%
+  arrange(desc(num_bedrooms), building_000sf) %>%
+  slice_head(n = 10) %>%
+  mutate(sale_price = money(sale_price)) %>%
+  knitr::kable(digits = 3,
+    col.names = c("ID", "Price", "Area (1,000 sq ft)", "Bedrooms",
+                  "Full baths", "Age", "Multi-parcel"),
+    align = c("r", "r", "r", "r", "r", "r", "r"),
+    caption = "Ten highest bedroom counts")
+```
+
+The houses with the most bedrooms generally have larger building areas. But two pairs have matching values in this table and are flagged as multisales, so we looked more closely at those records.
+
+```{r}
+all_sales %>%
+  filter(id %in% c(4348, 4349, 23563, 23564)) %>%
+  mutate(
+    location = st_as_text(geometry)
+  ) %>%
+  st_drop_geometry() %>%
+  arrange(as.Date(sale_date, "%B %d, %Y"), id) %>%
+  select(id, sale_date, sale_price, building_000sf, lotsize_acre, one_story, location) %>%
+  mutate(sale_price = money(sale_price)) %>%
+  knitr::kable(digits = 4,
+    col.names = c("ID", "Date", "Price", "Area (1,000 sq ft)",
+                  "Lot (acres)", "One story", "Location (feet)"),
+    align = c("r", "l", "r", "r", "r", "r", "l"),
+    caption = "The flagged pairs have distinct locations and attributes")
+```
+
+These records share sale dates and prices, but their locations and some property attributes differ. They are not exact duplicates. Cook County uses `is_multisale` for transactions involving multiple parcels. A shared price does not tell us what each parcel sold for separately. We assume the course CSV uses the same definition. [Assessor's example](https://ccao-data-science---modeling.gitlab.io/packages/assessr/articles/finding-sales-comps.html), [official model documentation](https://github.com/ccao-data/model-res-avm#readme).
+
+```{r}
+all_sales %>%
+  st_drop_geometry() %>%
+  count(split, is_multisale) %>%
+  group_by(split) %>%
+  mutate(percent = round(100 * n / sum(n), 2)) %>%
+  ungroup() %>%
+  knitr::kable(digits = 2,
+    col.names = c("Split", "Multi-parcel", "Sales", "Percent"),
+    align = c("l", "r", "r", "r"),
+    caption = "Multi-parcel flags in each input split")
+```
+
+We exclude the 1,232 training records flagged as multi-parcel sales (5.31%) because their prices may cover several parcels. That leaves 21,968 training observations. We keep every test record and do not set a minimum or maximum price cutoff. A very cheap or expensive sale is not necessarily an invalid one.
+
+
+### Lowest unflagged prices
+```{r}
+all_sales %>%
+  st_drop_geometry() %>%
+  filter(split == "train", is_multisale == 0) %>%
+  select(id, sale_date, sale_price, building_000sf,
+         num_bedrooms, num_full_baths, building_age) %>%
+  arrange(sale_price) %>%
+  slice_head(n = 10) %>%
+  mutate(sale_price = money(sale_price)) %>%
+  knitr::kable(digits = 3,
+    col.names = c("ID", "Date", "Price", "Area (1,000 sq ft)",
+                  "Bedrooms", "Full baths", "Age"),
+    align = c("r", "l", "r", "r", "r", "r", "r"),
+    caption = "Lowest unflagged training prices")
+```
+
+
+
+### Highest unflagged prices
+```{r}
+all_sales %>%
+  st_drop_geometry() %>%
+  filter(split == "train", is_multisale == 0) %>%
+  select(id, sale_date, sale_price, building_000sf,
+         num_bedrooms, num_full_baths, building_age) %>%
+  arrange(desc(sale_price)) %>%
+  slice_head(n = 10) %>%
+  mutate(sale_price = money(sale_price)) %>%
+  knitr::kable(digits = 3,
+    col.names = c("ID", "Date", "Price", "Area (1,000 sq ft)",
+                  "Bedrooms", "Full baths", "Age"),
+    align = c("r", "l", "r", "r", "r", "r", "r"),
+    caption = "Highest unflagged training prices")
+```
+
+
+
+
+### Apply the cleaning rules once
+
+We exclude multi-parcel sales from training but retain every test house. We do not remove training sales solely because their prices are unusually low or high.
+
+```{r}
+#| label: clean-training
+all_sales <- all_sales %>%
+  mutate(
+    sale_date = as.Date(sale_date, "%B %d, %Y"),
+    property_group = paste(round(lon, 5), round(lat, 5)),
+    eligible = split == "train" & is_multisale == 0 &
+      is.finite(sale_price) & sale_price > 0
+  )
+all_sales %>%
+  st_drop_geometry() %>%
+  count(year) %>%
+  knitr::kable(col.names = c("Sale year", "Input rows"),
+    align = c("r", "r"), caption = "Input coverage by year")
+
+train_single <- all_sales %>%
+  filter(split == "train", is_multisale == 0)
+
+
+train <- train_single %>%
+  filter(is.finite(sale_price), sale_price > 0)
+
+
+cleaning_log <- tibble(
+  stage = c("Original training rows", "Exclude multi-parcel sales",
+            "Exclude missing/nonpositive prices"),
+  remaining = c(nrow(raw_train), nrow(train_single), nrow(train))
+) %>%
+  mutate(removed_at_step = lag(remaining, default = first(remaining)) - remaining)
+knitr::kable(cleaning_log,
+  col.names = c("Cleaning step", "Rows remaining", "Removed at step"),
+    align = c("l", "r", "r"),
+  caption = "Training exclusions, applied once")
+
+# Count missing values in the outcome and the six affected predictors.
+missing_log <- all_sales %>%
+  st_drop_geometry() %>%
+  group_by(split) %>%
+  summarise(
+    sale_price = sum(is.na(sale_price)),
+    lotsize_acre = sum(is.na(lotsize_acre)),
+    num_half_baths = sum(is.na(num_half_baths)),
+    num_fireplaces = sum(is.na(num_fireplaces)),
+    garage_size = sum(is.na(garage_size)),
+    full_basement = sum(is.na(full_basement)),
+    warmairfurnace = sum(is.na(warmairfurnace))
+  ) %>%
+  pivot_longer(-split, names_to = "variable", values_to = "missing") %>%
+  filter(missing > 0)
+knitr::kable(missing_log,
+  col.names = c("Split", "Variable", "Missing values"),
+    align = c("l", "l", "r"),
+  caption = "Missingness before filling predictors; test prices are intentionally withheld")
+
+test <- all_sales %>% filter(split == "test")
+
+```
+
+We fill the six predictors that have missing values with medians from the fitting rows. During cross-validation, we calculate those medians separately inside each fitting fold. We use the same medians to fill that fold's held-out rows. We do not add missingness indicators or fill in test sale prices.
+
+### Exploration plots
+
+We use the cleaned training data to see how prices relate to size, age and location. These plots help us choose what to test in the models. We then use cross-validation to see whether those choices help.
+
+We start by looking at the price distribution. We want to see where most sales fall and how far the highest prices are from the rest. Errors on those expensive houses can have a big effect on RMSE. The labels are in millions, so `$1m` means $1,000,000. We are only changing the labels, not the prices.
+
+```{r}
+#| label: price-histogram
+#| fig-alt: "Histogram of all cleaned training sale prices in dollars, showing a long upper tail."
+#| fig-cap: "Prices are right-skewed. The dollar-axis histogram retains every cleaned training sale."
+ggplot(st_drop_geometry(train), aes(sale_price)) +
+  geom_histogram(bins = 60, fill = "#287D8E", color = "white") +
+  scale_x_continuous(labels = scales::label_dollar(scale = 1e-6, suffix = "m")) +
+  labs(x = "Sale price", y = "Sales")
+```
+
+Next, we compare building size with price. Do bigger houses sell for more, and how much do prices vary for houses of the same size? We multiply `building_000sf` by 1,000 to show square feet. The log axes make the smaller values easier to see alongside the larger ones, and transparency helps when points overlap. Our model still predicts prices in dollars. If the relationship looks curved, we have a reason to test a size transformation.
+
+```{r}
+#| label: price-size
+#| fig-alt: "Reported building area versus sale price for cleaned training houses, with logarithmic display axes."
+#| fig-cap: "Building size and price; both display axes are logarithmic. The regression outcome remains dollars."
+ggplot(st_drop_geometry(train), aes(building_000sf * 1000, sale_price)) +
+  geom_point(alpha = .15, size = .6, color = "#287D8E") +
+  scale_x_log10(labels = scales::label_comma()) + scale_y_log10(labels = money) +
+  labs(x = "Reported building area (square feet)", y = "Sale price (log display)")
+```
+
+We also look at price against building age. We want to see whether a straight-line relationship seems reasonable or whether we should test age squared as well. We do not remove a house just because it is old. Again, the log price axis is only for the plot.
+
+```{r}
+#| label: age-price
+#| fig-alt: "Building age versus sale price for cleaned training houses, with a logarithmic price display axis."
+#| fig-cap: "Prices vary widely within building ages; age alone is not a cleaning rule."
+ggplot(st_drop_geometry(train), aes(building_age, sale_price)) +
+  geom_point(alpha = .12, size = .6, color = "#287D8E") +
+  scale_y_log10(labels = money) + labs(x = "Building age (years)", y = "Sale price (log display)")
+```
+
+Finally, we map the sales to see where higher and lower prices cluster. Each point is a sale, and the color shows its price. If prices vary across the city, we have a reason to test location features alongside house characteristics. The map alone cannot explain why those differences exist. We use a log color scale so a few expensive sales do not dominate the colors.
+
+```{r}
+#| label: training-price-map
+#| fig-alt: "Map of cleaned training house locations colored by sale price on a logarithmic scale."
+#| fig-cap: "Cleaned training sales. Color uses a logarithmic price scale; no expensive records are hidden."
+#| fig-height: 7
+ggplot(train) + geom_sf(aes(color = sale_price), size = .35, alpha = .6) +
+  scale_color_viridis_c(trans = "log10", labels = money, name = "Sale price") +
+  coord_sf(datum = NA) + labs(x = NULL, y = NULL)
+```
+
+**Answer: What in your exploration shaped your modeling choices?**
+
+Houses with similar sizes sell for very different prices, so we did not expect house characteristics alone to explain everything. We started with a structure-only model, then tested squared size and age terms and an alternative using log size. The map also gave us a reason to test location features. We used cross-validation to check whether those additions helped.
+
+We kept the unusually low and high prices because we did not have enough evidence to call them errors. That choice has consequences: expensive sales can drive dollar RMSE, while a relatively small dollar error can be a large percentage of a cheap house's price. We return to both issues in Part 4.
+
+---
+
+## Part 2: Build the model
+
+Start with a structure-only baseline. Then add features in steps you can learn from, logging each one. Keep the log in a tibble with columns `model`, `added`, `cv_rmse`, `moran_i`, `notes`.
+
+### Download the geographic and income data
+
+
+```{r}
+#| label: download-sources
+acs_tracts <- get_acs(
+  geography = "tract",
+  state = "IL",
+  county = "Cook",
+  variables = c(income = "B19013_001"),
+  year = 2023,
+  survey = "acs5",
+  output = "wide",
+  geometry = TRUE,
+  progress_bar = FALSE
+) %>%
+  st_transform(3435)
+
+income <- acs_tracts %>%
+  st_drop_geometry() %>%
+  select(GEOID, income = incomeE, income_moe = incomeM) %>%
+  mutate(income = if_else(income > 0, income, NA_real_))
+
+tracts <- acs_tracts %>% select(GEOID, NAME)
+```
+
+### Build the location features
+
+We join houses to Census tracts, calculate their distance from the Loop, and make three distance rings. The tract is a place category, like the district factor in Week 6. We use these location features without using other houses' prices.
+
+```{r}
+#| label: spatial-features
+all_sales <- st_join(
+  all_sales, tracts %>% select(tract = GEOID),
+  join = st_intersects, left = TRUE
+) %>%
+  distinct(id, .keep_all = TRUE) %>%
+  left_join(income, by = c("tract" = "GEOID"))
+
+all_sales %>% st_drop_geometry() %>% count(split)
+
+cbd <- st_sfc(st_point(c(-87.6298, 41.8781)), crs = 4326) %>%
+  st_transform(3435)
+
+all_sales$dist_cbd_mi <- as.numeric(st_distance(all_sales, cbd)) / 5280
+
+all_sales <- all_sales %>%
+  mutate(
+    ring = case_when(
+      dist_cbd_mi < 3 ~ "Core",
+      dist_cbd_mi < 8 ~ "Inner",
+      TRUE ~ "Outer"
+    ),
+    ring = factor(ring, levels = c("Core", "Inner", "Outer")),
+    year_f = factor(year),
+    quarter_f = factor(sale_qrt)
+  )
+
+train <- all_sales %>% filter(eligible)
+test <- all_sales %>% filter(split == "test")
+```
+
+A point on a tract boundary can match more than one polygon. We keep its first match so that it still contributes one row. Unmatched locations stay in the data.
+
+### Prepare the tract categories
+
+We count distinct location groups within each training tract. Tracts with fewer than 15 groups, unmatched tracts and test tracts absent from training go into "Other". This follows the notes' idea of pooling small categories. "Other" can combine unrelated places, so its predictions deserve care. The threshold uses location counts, not prices. Below, we display how many folds contain each tract category. A category found in only one fold would have no fitting examples when that fold is held out.
+
+```{r}
+#| label: tract-categories
+large_tracts <- train %>%
+  st_drop_geometry() %>%
+  distinct(tract, property_group) %>%
+  count(tract) %>%
+  filter(!is.na(tract), n >= 15) %>%
+  pull(tract)
+
+all_sales <- all_sales %>%
+  mutate(
+    tract_fe = if_else(!is.na(tract) & tract %in% large_tracts, tract, "Other"),
+    tract_fe = factor(tract_fe)
+  )
+
+train <- all_sales %>% filter(eligible)
+test <- all_sales %>% filter(split == "test")
+
+tibble(
+  sample = c("Cleaned training", "Instructor test"),
+  rows = c(nrow(train), nrow(test))
+)
+```
+
+### Fill missing predictors
+
+We need a prediction for every test house, so we fill missing predictors instead of dropping test rows. Week 8 uses `replace_na()` and `median()` for this. During CV, we calculate the medians from the fitting fold only. For the final test predictions, we use medians from all cleaned training rows.
+
+The `reference` argument tells the function which rows provide those medians. Writing the columns separately lets us see exactly what gets filled.
+
+```{r}
+#| label: fill-missing
+fill_missing <- function(data, reference) {
+  data <- st_drop_geometry(data)
+  reference <- st_drop_geometry(reference)
+
+  data %>%
+    mutate(
+      lotsize_acre = replace_na(lotsize_acre,
+        median(reference$lotsize_acre, na.rm = TRUE)),
+      num_half_baths = replace_na(num_half_baths,
+        median(reference$num_half_baths, na.rm = TRUE)),
+      num_fireplaces = replace_na(num_fireplaces,
+        median(reference$num_fireplaces, na.rm = TRUE)),
+      garage_size = replace_na(garage_size,
+        median(reference$garage_size, na.rm = TRUE)),
+      full_basement = replace_na(full_basement,
+        median(reference$full_basement, na.rm = TRUE)),
+      warmairfurnace = replace_na(warmairfurnace,
+        median(reference$warmairfurnace, na.rm = TRUE))
+    )
+}
+```
+
+### Create the same folds for every model
+
+We use all cleaned training rows in ten-fold CV. In each round, nine folds fit the model and the remaining fold checks it. Each house gets a prediction from a model that did not use its sale price. We use these out-of-fold predictions for the residual maps and error analysis, as in Week 8.
+
+Records at the same rounded coordinates stay in the same fold. This is a proxy for repeated properties because we do not have parcel IDs. It can group distinct nearby houses or miss repeat records whose coordinates differ. Nearby houses can still appear across folds.
+
+```{r}
+#| label: prepare-folds
+train_data <- train %>% st_drop_geometry()
+unique_properties <- unique(train_data$property_group)
+
+set.seed(5080)
+property_folds <- sample(rep(1:10, length.out = length(unique_properties)))
+folds <- property_folds[match(train_data$property_group, unique_properties)]
+
+tibble(fold = folds) %>%
+  count(fold) %>%
+  knitr::kable(col.names = c("Fold", "Training rows"),
+    align = c("r", "r"), caption = "Rows in each held-out fold")
+
+train_data %>%
+  mutate(fold = folds) %>%
+  count(tract_fe, fold) %>%
+  group_by(tract_fe) %>%
+  summarise(folds_present = n(), .groups = "drop") %>%
+  count(folds_present) %>%
+  knitr::kable(col.names = c("Folds represented", "Tract categories"),
+    align = c("r", "r"),
+    caption = "Coverage of tract categories across folds")
+```
+
+### Write the model formulas
+
+We compare house attributes, squared terms and timing, log size, distance, squared distance, rings, a size-by-ring interaction, and tract fixed effects. After inspecting negative predictions, we also compare three size alternatives and an age-by-ring interaction. Squared terms let a relationship bend. The interaction lets the size slope differ across rings. Tract fixed effects allow different intercepts across tracts. The outcome stays in dollars.
+
+```{r}
+#| label: candidate-formulas
+f0 <- sale_price ~ building_000sf + building_age + lotsize_acre + num_bedrooms +
+  num_full_baths + num_half_baths + num_fireplaces + garage_size + central_air +
+  one_story + full_basement + finished_basement + brick_stone_ext + warmairfurnace
+
+f1 <- sale_price ~ building_000sf + building_age + num_bedrooms + num_full_baths +
+  num_half_baths + num_fireplaces + garage_size + central_air + one_story +
+  full_basement + finished_basement + brick_stone_ext + warmairfurnace +
+  log(1 + lotsize_acre) + I(building_000sf^2) + I(building_age^2) + year_f +
+  quarter_f
+
+f2 <- sale_price ~ building_age + num_bedrooms + num_full_baths + num_half_baths +
+  num_fireplaces + garage_size + central_air + one_story + full_basement +
+  finished_basement + brick_stone_ext + warmairfurnace + log(1 + lotsize_acre) +
+  I(building_age^2) + year_f + quarter_f + log(building_000sf)
+
+f3 <- sale_price ~ building_000sf + building_age + num_bedrooms + num_full_baths +
+  num_half_baths + num_fireplaces + garage_size + central_air + one_story +
+  full_basement + finished_basement + brick_stone_ext + warmairfurnace +
+  log(1 + lotsize_acre) + I(building_000sf^2) + I(building_age^2) + year_f +
+  quarter_f + dist_cbd_mi
+
+f4 <- sale_price ~ building_000sf + building_age + num_bedrooms + num_full_baths +
+  num_half_baths + num_fireplaces + garage_size + central_air + one_story +
+  full_basement + finished_basement + brick_stone_ext + warmairfurnace +
+  log(1 + lotsize_acre) + I(building_000sf^2) + I(building_age^2) + year_f +
+  quarter_f + dist_cbd_mi + I(dist_cbd_mi^2)
+
+f5 <- sale_price ~ building_000sf + building_age + num_bedrooms + num_full_baths +
+  num_half_baths + num_fireplaces + garage_size + central_air + one_story +
+  full_basement + finished_basement + brick_stone_ext + warmairfurnace +
+  log(1 + lotsize_acre) + I(building_000sf^2) + I(building_age^2) + year_f +
+  quarter_f + ring
+
+f6 <- sale_price ~ building_000sf + building_age + num_bedrooms + num_full_baths +
+  num_half_baths + num_fireplaces + garage_size + central_air + one_story +
+  full_basement + finished_basement + brick_stone_ext + warmairfurnace +
+  log(1 + lotsize_acre) + I(building_000sf^2) + I(building_age^2) + year_f +
+  quarter_f + ring + building_000sf:ring
+
+f7 <- sale_price ~ building_000sf + building_age + num_bedrooms + num_full_baths +
+  num_half_baths + num_fireplaces + garage_size + central_air + one_story +
+  full_basement + finished_basement + brick_stone_ext + warmairfurnace +
+  log(1 + lotsize_acre) + I(building_000sf^2) + I(building_age^2) + year_f +
+  quarter_f + tract_fe + ring + building_000sf:ring
+
+# Follow-up: test simpler size shapes and a local size slope.
+f8 <- sale_price ~ building_000sf + building_age + num_bedrooms + num_full_baths +
+  num_half_baths + num_fireplaces + garage_size + central_air + one_story +
+  full_basement + finished_basement + brick_stone_ext + warmairfurnace +
+  log(1 + lotsize_acre) + I(building_age^2) + year_f +
+  quarter_f + tract_fe + ring + building_000sf:ring
+
+f9 <- sale_price ~ log(building_000sf) + building_age + num_bedrooms + num_full_baths +
+  num_half_baths + num_fireplaces + garage_size + central_air + one_story +
+  full_basement + finished_basement + brick_stone_ext + warmairfurnace +
+  log(1 + lotsize_acre) + I(building_age^2) + year_f +
+  quarter_f + tract_fe + ring + log(building_000sf):ring
+
+f10 <- sale_price ~ building_000sf + building_age + num_bedrooms + num_full_baths +
+  num_half_baths + num_fireplaces + garage_size + central_air + one_story +
+  full_basement + finished_basement + brick_stone_ext + warmairfurnace +
+  log(1 + lotsize_acre) + I(building_000sf^2) + I(building_age^2) + year_f +
+  quarter_f + tract_fe + ring + building_000sf:ring + building_000sf:tract_fe
+
+# Follow-up: older houses may have a different price relationship across rings.
+f11 <- sale_price ~ building_000sf + building_age + num_bedrooms + num_full_baths +
+  num_half_baths + num_fireplaces + garage_size + central_air + one_story +
+  full_basement + finished_basement + brick_stone_ext + warmairfurnace +
+  log(1 + lotsize_acre) + I(building_000sf^2) + I(building_age^2) + year_f +
+  quarter_f + tract_fe + ring + building_000sf:ring + building_000sf:tract_fe +
+  building_age:ring
+```
+
+### Cross-validation and spatial weights
+
+This loop follows Week 7. We fill missing predictors using the fitting rows before calling `lm()`. We keep the raw predictions, including negative values, when we calculate error. We do not replace them with zero. Negative predictions show where this linear model gives an impossible house value.
+
+```{r}
+#| label: validation-functions
+cv_predictions <- function(formula, data, fold_id) {
+  predictions <- rep(NA_real_, nrow(data))
+
+  for (k in 1:10) {
+    validation <- fold_id == k
+    fitting <- fill_missing(data[!validation, ], data[!validation, ])
+    validating <- fill_missing(data[validation, ], data[!validation, ])
+
+    fit <- lm(formula, data = fitting)
+    predictions[validation] <- predict(fit, newdata = validating)
+  }
+
+  predictions
+}
+
+morans_i <- function(values, weights) {
+  moran(values, weights, n = length(values), S0 = Szero(weights))$I
+}
+
+coords <- st_coordinates(train)
+has_duplicate_locations <- anyDuplicated(coords) > 0
+house_knn <- knearneigh(
+  coords, k = 5, longlat = FALSE,
+  use_kd_tree = !has_duplicate_locations
+)
+house_nb <- knn2nb(house_knn)
+weights <- nb2listw(house_nb, style = "W")
+```
+
+We use five nearest neighbors and row-standardized weights, as in the notes. Duplicate locations can create ties, so their ordering can affect the neighbor choice.
+
+### Compare the models
+
+We run each formula on the same rows and folds. For each one, we subtract held-out predictions from actual prices, calculate dollar RMSE and Moran's I, and add a row to the log. A positive residual means we predicted too low; a negative one means we predicted too high.
+
+```{r}
+#| label: part-2
+# Model 0: House characteristics only.
+pred0 <- cv_predictions(f0, train_data, folds)
+error0 <- train_data$sale_price - pred0
+
+model_log <- tibble(
+  model = "House_only",
+  added = "Benchmark: assess prediction from house characteristics alone",
+  cv_rmse = sqrt(mean(error0^2)),
+  moran_i = morans_i(error0, weights),
+  notes = "Same grouped folds; median filling inside fitting folds; raw dollar predictions"
+)
+
+# Model 1: Squared size/age, log lot area, year and quarter.
+pred1 <- cv_predictions(f1, train_data, folds)
+error1 <- train_data$sale_price - pred1
+
+model_log <- model_log %>%
+  add_row(
+    model = "Curved_and_time",
+    added = "Test curved size/age relationships and sale timing",
+    cv_rmse = sqrt(mean(error1^2)),
+    moran_i = morans_i(error1, weights),
+    notes = "Same grouped folds; median filling inside fitting folds; raw dollar predictions"
+  )
+
+# Model 2: Log size instead of quadratic size.
+pred2 <- cv_predictions(f2, train_data, folds)
+error2 <- train_data$sale_price - pred2
+
+model_log <- model_log %>%
+  add_row(
+    model = "Log_size",
+    added = "Test an alternative shape for the size relationship",
+    cv_rmse = sqrt(mean(error2^2)),
+    moran_i = morans_i(error2, weights),
+    notes = "Same grouped folds; median filling inside fitting folds; raw dollar predictions"
+  )
+
+# Model 3: Add distance to the Loop.
+pred3 <- cv_predictions(f3, train_data, folds)
+error3 <- train_data$sale_price - pred3
+
+model_log <- model_log %>%
+  add_row(
+    model = "Downtown_distance",
+    added = "Test whether downtown proximity improves prediction",
+    cv_rmse = sqrt(mean(error3^2)),
+    moran_i = morans_i(error3, weights),
+    notes = "Same grouped folds; median filling inside fitting folds; raw dollar predictions"
+  )
+
+# Model 4: Add squared distance.
+pred4 <- cv_predictions(f4, train_data, folds)
+error4 <- train_data$sale_price - pred4
+
+model_log <- model_log %>%
+  add_row(
+    model = "Squared_distance",
+    added = "Allow the downtown-distance relationship to bend",
+    cv_rmse = sqrt(mean(error4^2)),
+    moran_i = morans_i(error4, weights),
+    notes = "Same grouped folds; median filling inside fitting folds; raw dollar predictions"
+  )
+
+# Model 5: Use distance rings.
+pred5 <- cv_predictions(f5, train_data, folds)
+error5 <- train_data$sale_price - pred5
+
+model_log <- model_log %>%
+  add_row(
+    model = "Distance_rings",
+    added = "Test broad location categories instead of continuous distance",
+    cv_rmse = sqrt(mean(error5^2)),
+    moran_i = morans_i(error5, weights),
+    notes = "Same grouped folds; median filling inside fitting folds; raw dollar predictions"
+  )
+
+# Model 6: Let the size slope vary by ring.
+pred6 <- cv_predictions(f6, train_data, folds)
+error6 <- train_data$sale_price - pred6
+
+model_log <- model_log %>%
+  add_row(
+    model = "Size_by_ring",
+    added = "Test whether the value associated with size differs by ring",
+    cv_rmse = sqrt(mean(error6^2)),
+    moran_i = morans_i(error6, weights),
+    notes = "Same grouped folds; median filling inside fitting folds; raw dollar predictions"
+  )
+
+# Model 7: Add Census-tract fixed effects.
+pred7 <- cv_predictions(f7, train_data, folds)
+error7 <- train_data$sale_price - pred7
+
+model_log <- model_log %>%
+  add_row(
+    model = "Tract_effects",
+    added = "Account for local price-level differences beyond rings",
+    cv_rmse = sqrt(mean(error7^2)),
+    moran_i = morans_i(error7, weights),
+    notes = "Same grouped folds; median filling inside fitting folds; raw dollar predictions"
+  )
+
+# Model 8: Remove squared size; check whether its curvature drives poor small-house predictions
+pred8 <- cv_predictions(f8, train_data, folds)
+error8 <- train_data$sale_price - pred8
+model_log <- model_log %>%
+  add_row(
+    model = "Tract_linear_size",
+    added = "Remove squared size; check whether its curvature drives poor small-house predictions",
+    cv_rmse = sqrt(mean(error8^2)),
+    moran_i = morans_i(error8, weights),
+    notes = "Same grouped folds; median filling inside fitting folds; raw dollar predictions"
+  )
+
+# Model 9: Use log size with tract intercepts and size-by-ring interaction
+pred9 <- cv_predictions(f9, train_data, folds)
+error9 <- train_data$sale_price - pred9
+model_log <- model_log %>%
+  add_row(
+    model = "Tract_log_size",
+    added = "Use log size with tract intercepts and size-by-ring interaction",
+    cv_rmse = sqrt(mean(error9^2)),
+    moran_i = morans_i(error9, weights),
+    notes = "Same grouped folds; median filling inside fitting folds; raw dollar predictions"
+  )
+
+# Model 10: Allow the building-area slope to differ by tract
+pred10 <- cv_predictions(f10, train_data, folds)
+error10 <- train_data$sale_price - pred10
+model_log <- model_log %>%
+  add_row(
+    model = "Tract_size_slopes",
+    added = "Allow the building-area slope to differ by tract",
+    cv_rmse = sqrt(mean(error10^2)),
+    moran_i = morans_i(error10, weights),
+    notes = "Same grouped folds; median filling inside fitting folds; raw dollar predictions"
+  )
+
+# Model 11: Let the age slope differ across distance rings.
+pred11 <- cv_predictions(f11, train_data, folds)
+error11 <- train_data$sale_price - pred11
+model_log <- model_log %>%
+  add_row(
+    model = "Age_by_ring",
+    added = "Let the age slope differ across rings; investigate older-house errors",
+    cv_rmse = sqrt(mean(error11^2)),
+    moran_i = morans_i(error11, weights),
+    notes = "Same grouped folds; median filling inside fitting folds; raw dollar predictions"
+  )
+
+write_csv(model_log, "reports/assignment5/model_log.csv")
+
+
+knitr::kable(
+  model_log %>%
+    select(model, added, cv_rmse, moran_i) %>%
+    mutate(cv_rmse = money(cv_rmse), moran_i = round(moran_i, 3)),
+  col.names = c("Model", "Why we tried it", "CV RMSE", "Moran's I"),
+    align = c("l", "l", "r", "r"),
+  caption = "Current comparison: twelve formulas on shared grouped 10-fold CV"
+)
+```
+
+### Check the alternatives and low-price errors
+
+The earlier tract model produced impossible negative values, mainly in a few tracts with older houses. We first tested three changes to its size relationship. After reviewing the remaining held-out errors, we also tested whether the age slope should differ across distance rings. Both interactions use the numeric-by-category pattern from class. Tract-specific size slopes add many coefficients and can be unstable in small groups.
+
+We compare out-of-fold errors for the original tract model and the four alternatives. The low-price group is defined by observed training sale prices only for diagnostics. We cannot use that group to choose a different formula for test houses, whose prices are hidden.
+
+```{r}
+#| label: size-alternative-checks
+size_checks <- bind_rows(
+  train %>% mutate(model = "Tract_effects", pred = pred7),
+  train %>% mutate(model = "Tract_linear_size", pred = pred8),
+  train %>% mutate(model = "Tract_log_size", pred = pred9),
+  train %>% mutate(model = "Tract_size_slopes", pred = pred10),
+  train %>% mutate(model = "Age_by_ring", pred = pred11)
+) %>%
+  st_drop_geometry()
+
+size_summary <- size_checks %>%
+  group_by(model) %>%
+  summarise(
+    cv_rmse = sqrt(mean((sale_price - pred)^2)),
+    negative_oof = sum(pred < 0),
+    .groups = "drop"
+  )
+
+low_price_summary <- size_checks %>%
+  filter(sale_price <= 100000) %>%
+  group_by(model) %>%
+  summarise(
+    n = n(),
+    median_ratio = median(pred / sale_price),
+    share_overvalued = mean(pred > sale_price),
+    mae = mean(abs(sale_price - pred)),
+    .groups = "drop"
+  )
+
+knitr::kable(
+  size_summary %>% mutate(cv_rmse = money(cv_rmse)),
+  col.names = c("Model", "CV RMSE", "Negative predictions"),
+    align = c("l", "r", "r"),
+  caption = "Follow-up alternatives: held-out errors"
+)
+knitr::kable(
+  low_price_summary %>% mutate(
+    median_ratio = round(median_ratio, 3),
+    share_overvalued = pct(share_overvalued), mae = money(mae)
+  ),
+  col.names = c("Model", "Sales", "Median ratio", "Overpredicted", "MAE"),
+    align = c("l", "r", "r", "r", "r"),
+  caption = "Held-out errors for sales up to $100,000"
+)
+write_csv(size_summary, "reports/assignment5/size_alternatives.csv")
+write_csv(low_price_summary, "reports/assignment5/low_price_comparison.csv")
+
+# Compare the earlier tract model and selected model within the same ten folds.
+fold_scores <- tibble(
+  fold = folds,
+  earlier_error = error7,
+  selected_error = error11
+) %>%
+  group_by(fold) %>%
+  summarise(
+    earlier_rmse = sqrt(mean(earlier_error^2)),
+    selected_rmse = sqrt(mean(selected_error^2)),
+    .groups = "drop"
+  )
+knitr::kable(
+  fold_scores %>% mutate(earlier_rmse = money(earlier_rmse), selected_rmse = money(selected_rmse)),
+  col.names = c("Fold", "Earlier tract RMSE", "Selected RMSE"),
+    align = c("r", "r", "r"),
+  caption = "Earlier tract model and selected model by fold"
+)
+write_csv(fold_scores, "reports/assignment5/fold_comparison.csv")
+```
+
+Allowing the size slope to vary by tract improved CV RMSE and reduced negative held-out predictions. The age-by-ring follow-up lowered CV RMSE from about $198,468 to $198,335 and reduced negative held-out predictions from 17 to 16. The $133 RMSE difference is small, so we do not treat this as a substantial gain. The selected model had lower RMSE in `r sum(fold_scores$selected_rmse < fold_scores$earlier_rmse)` of the ten folds compared with the earlier tract-intercept model. This is a comparison within the same CV run, not an independent test.
+
+For the low-price group, the age-by-ring model reduced mean absolute dollar error slightly compared with the local-size model, but its median valuation ratio was still about 2.23. We keep the lowest-CV-RMSE formula for the assignment's dollar-error objective and describe proportional overvaluation as a remaining weakness. We do not delete these sales, log the outcome or replace negative predictions with a floor.
+
+We use ACS income only to describe errors later. The 2019–2023 ACS estimates were released after some of these sales, so using them as predictors would introduce future information for those sales. The tract boundaries provide location categories; they are not income predictors.
+
+Sources: [2023 ACS API](https://api.census.gov/data/2023/acs/acs5.html), [B19013 metadata](https://api.census.gov/data/2023/acs/acs5/groups/B19013.html), [2023 tract boundaries](https://www2.census.gov/geo/tiger/GENZ2023/shp/).
+
+---
+
+## Part 3: Final model
+
+Show your final model, the model log, and baseline vs. final residual maps.
+
+### Choose the model and fit all cleaned training rows
+
+We compare the log by CV RMSE and write our chosen formula directly. If a rerun changes that ranking, we need to revisit the choice. The final fit uses every cleaned training row.
+
+```{r}
+#| label: choose-model
+
+
+best_name <- "Age_by_ring"
+f_final <- f11
+final_predictions <- pred11
+best_row <- model_log %>% filter(model == best_name)
+baseline_row <- model_log %>% filter(model == "House_only")
+
+final_cv_rmse <- sqrt(mean((train$sale_price - final_predictions)^2))
+
+final_training <- fill_missing(train, train)
+final_test <- fill_missing(test, train)
+m_final <- lm(f_final, data = final_training)
+
+cat("Selected model:", best_name, "\n")
+f_final
+
+diagnostics <- train %>%
+  mutate(
+    pred = final_predictions,
+    residual = sale_price - pred,
+    abs_error = abs(residual),
+    ratio = pred / sale_price
+  )
+```
+<details>
+<summary>Final model coefficients</summary>
+
+```{r}
+#| label: final-coefficients
+tibble(
+  term = names(coef(m_final)),
+  estimate = as.numeric(coef(m_final))
+) %>%
+  filter(!grepl("tract_fe", term)) %>%
+  knitr::kable(
+    digits = 2,
+    col.names = c("Term", "Coefficient"),
+    align = c("l", "r"),
+    caption = "House, timing and ring coefficients; tract-specific terms omitted for readability"
+  )
+```
+
+The formula above includes the tract intercepts and tract-specific size slopes. This table leaves those many geographic terms out of the display.
+
+<details>
+<summary>Full regression summary, including all tract terms</summary>
+
+```{r}
+#| label: full-model-summary
+summary(m_final)
+```
+
+</details>
+</details>
+
+```{r}
+#| label: residual-comparison
+#| fig-alt: "Baseline and selected-model maps of out-of-fold actual minus predicted prices, using the same color scale."
+#| fig-height: 7
+#| fig-width: 10
+#| fig-cap: "Actual minus out-of-fold predicted price on all cleaned training rows. Colors saturate at the common 95th percentile of absolute errors; every point remains shown and RMSE uses the full errors."
+residual_maps <- bind_rows(
+  train %>% mutate(model = "Structure-only baseline", residual = sale_price - pred0),
+  train %>% mutate(model = "Selected model", residual = sale_price - final_predictions)
+) %>%
+  mutate(model = factor(model, levels = c("Structure-only baseline", "Selected model")))
+limit <- as.numeric(quantile(abs(residual_maps$residual), .95))
+ggplot(residual_maps) +
+  geom_sf(aes(color = residual), size = .3, alpha = .65) +
+  facet_wrap(~model) +
+  coord_sf(datum = NA) +
+  scale_color_gradient2(
+    low = "#2166AC", mid = "#F7F7F7", high = "#B2182B",
+    limits = c(-limit, limit), oob = scales::squish,
+    labels = money, name = "Residual ($)"
+  ) +
+  labs(x = NULL, y = NULL)
+```
+
+### Locate the remaining clusters with LISA
+
+Global Moran's I gives us one summary of spatial clustering. The Week 8 LISA map helps us see where it occurs. We use the slides' helper, five-neighbor weights, 499 permutations and a 0.01 significance threshold. We set the seed for reproducibility.
+
+High–High means a house and its neighbors have above-average residuals. Low–Low means below-average residuals. Since the residual is actual minus predicted, these usually indicate areas of underprediction and overprediction, respectively. The categories are relative to the mean residual, not strictly to zero. These are exploratory maps with many local tests, not proof of a cause.
+
+```{r}
+#| label: lisa-diagnostics
+lisa_quads <- function(resid, w, alpha = 0.01) {
+  lm_perm <- localmoran_perm(resid, w, nsim = 499)
+  z <- resid - mean(resid)
+  neighbor_lag <- lag.listw(w, z)
+  p <- lm_perm[, "Pr(z != E(Ii)) Sim"]
+
+  case_when(
+    is.na(p) | p >= alpha ~ "Not significant",
+    z > 0 & neighbor_lag > 0 ~ "High-High",
+    z < 0 & neighbor_lag < 0 ~ "Low-Low",
+    z > 0 & neighbor_lag < 0 ~ "High-Low",
+    TRUE ~ "Low-High"
+  )
+}
+
+set.seed(5080)
+baseline_lisa <- lisa_quads(error0, weights)
+set.seed(5080)
+final_lisa <- lisa_quads(diagnostics$residual, weights)
+
+lisa_maps <- bind_rows(
+  train %>% mutate(model = "Structure-only baseline", cluster = baseline_lisa),
+  train %>% mutate(model = "Selected model", cluster = final_lisa)
+) %>%
+  mutate(model = factor(model, levels = c("Structure-only baseline", "Selected model")))
+
+cluster_counts <- lisa_maps %>%
+  st_drop_geometry() %>%
+  count(model, cluster)
+knitr::kable(cluster_counts,
+  col.names = c("Model", "LISA classification", "Houses"),
+    align = c("l", "l", "r"),
+  caption = "Exploratory LISA classifications")
+
+```
+
+```{r}
+#| label: lisa-map
+#| fig-alt: "Baseline and selected-model LISA maps showing significant clusters and outliers in out-of-fold residuals."
+#| fig-height: 7
+#| fig-width: 10
+#| fig-cap: "Baseline and selected-model LISA maps using out-of-fold residuals. Significant clusters are drawn over the grey points."
+quad_cols <- c(
+  "High-High" = "#b2182b", "Low-Low" = "#2166ac",
+  "High-Low" = "#f4a582", "Low-High" = "#92c5de",
+  "Not significant" = "grey88"
+)
+
+ggplot() +
+  geom_sf(
+    data = filter(lisa_maps, cluster == "Not significant"),
+    color = "grey88", size = .3
+  ) +
+  geom_sf(
+    data = filter(lisa_maps, cluster != "Not significant"),
+    aes(color = cluster), size = .6
+  ) +
+  facet_wrap(~model) +
+  scale_color_manual(values = quad_cols) +
+  coord_sf(datum = NA) +
+  theme_void() +
+  labs(color = NULL)
+```
+
+**Answer: What helped most, and what disappointed you?**
+
+We chose `r best_name` because it had the lowest CV RMSE: `r money(best_row$cv_rmse)`, compared with `r money(baseline_row$cv_rmse)` for the baseline. That is a `r pct(1 - best_row$cv_rmse / baseline_row$cv_rmse)` reduction. Tract categories add local differences that distance from downtown and broad rings cannot capture. The selected model lets the association between building area and price vary by tract and the age slope vary by distance ring. This is the same numeric-predictor-by-category interaction pattern as Week 6, applied to a different place category. It adds many coefficients, so better CV performance matters more than how well it fits the training rows.
+
+Residual Moran's I changed from `r round(baseline_row$moran_i, 3)` to `r round(best_row$moran_i, 3)`. The number of houses classified as High–High fell from `r sum(baseline_lisa == "High-High")` to `r sum(final_lisa == "High-High")`, and Low–Low fell from `r sum(baseline_lisa == "Low-Low")` to `r sum(final_lisa == "Low-Low")`. These are counts of houses, not separate clusters. The maps show where the remaining patterns occur. They suggest places to investigate missing neighborhood characteristics, but they do not tell us what those characteristics are.
+
+This is the best model among the formulas in the current comparison. We used the same CV results to choose it and describe its errors, so its winning score can be optimistic. We have not added features from other houses' prices or used the ACS income estimates to predict early sales.
+
+---
+
+## Part 4: Where it fails, and who pays
+
+**4A.** Where does your final model fail worst? Is it guessing too high or too low there, and why do you think so?
+
+**4B.** Assessors judge their work with the **ratio** of predicted value to sale price. A ratio above 1 means the home is over-valued and its owner over-taxed. Does your model's ratio differ by neighborhood income? Connect your answer to your Part 1 cleaning rules and to "The Tax Divide."
+
+We use each training house's out-of-fold prediction here, rather than the prediction from the final model that was fitted to that house. The errors include every cleaned training row, including negative predictions. We group prices into the fixed bands used in Week 7.
+
+```{r}
+#| label: error-diagnostics
+cuts <- quantile(income$income[is.finite(income$income)], c(1/3, 2/3), names = FALSE)
+diagnostics <- diagnostics %>%
+  mutate(
+    income_group = factor(
+      case_when(
+        is.na(income) ~ "Unknown",
+        income <= cuts[1] ~ "Lower",
+        income <= cuts[2] ~ "Middle",
+        TRUE ~ "Higher"
+      ),
+      levels = c("Lower", "Middle", "Higher", "Unknown")
+    )
+  )
+
+fairness <- diagnostics %>%
+  st_drop_geometry() %>%
+  group_by(income_group) %>%
+  summarise(
+    n = n(),
+    median_income = median(income, na.rm = TRUE),
+    median_ratio = median(ratio),
+    aggregate_ratio = sum(pred) / sum(sale_price),
+    share_overvalued = mean(ratio > 1),
+    mae = mean(abs_error),
+    .groups = "drop"
+  )
+
+price_fairness <- diagnostics %>%
+  st_drop_geometry() %>%
+  mutate(
+    price_group = cut(
+      sale_price,
+      breaks = c(-Inf, 100000, 250000, 500000, Inf),
+      labels = c("Up to $100k", "$100k–$250k", "$250k–$500k", "Above $500k")
+    )
+  ) %>%
+  group_by(price_group) %>%
+  summarise(
+    n = n(), median_price = median(sale_price),
+    median_ratio = median(ratio), .groups = "drop"
+  )
+
+geographic_errors <- diagnostics %>%
+  st_drop_geometry() %>%
+  filter(!is.na(tract)) %>%
+  group_by(tract) %>%
+  summarise(
+    n = n(), mae = mean(abs_error),
+    mean_residual = mean(residual), .groups = "drop"
+  ) %>%
+  filter(n >= 10) %>%
+  arrange(desc(mae))
+
+worst <- diagnostics %>%
+  st_drop_geometry() %>%
+  arrange(desc(abs_error)) %>%
+  select(id, tract, sale_price, pred, residual, building_000sf, income_group) %>%
+  slice_head(n = 10)
+
+unmatched_tracts <- sum(is.na(all_sales$tract))
+```
+```{r}
+#| label: part-4
+knitr::kable(
+  worst %>% mutate(sale_price = money(sale_price), pred = money(pred), residual = money(residual)),
+  col.names = c("ID", "Tract", "Sale price", "Prediction", "Residual", "Area (1,000 sq ft)", "Income group"),
+    align = c("r", "r", "r", "r", "r", "r", "l"),
+  caption = "Largest absolute out-of-fold errors"
+)
+knitr::kable(
+  head(geographic_errors, 10) %>% mutate(mae = money(mae), mean_residual = money(mean_residual)),
+  col.names = c("Tract", "Sales", "MAE", "Mean residual"),
+    align = c("r", "r", "r", "r"),
+  caption = "Highest out-of-fold MAE by tract, with at least 10 cleaned training sales"
+)
+knitr::kable(
+  fairness %>% mutate(
+    median_income = money(median_income),
+    median_ratio = round(median_ratio, 3),
+    aggregate_ratio = round(aggregate_ratio, 3),
+    share_overvalued = pct(share_overvalued), mae = money(mae)
+  ),
+  col.names = c("Income group", "Sales", "Median income", "Median ratio", "Aggregate ratio", "Overpredicted", "MAE"),
+    align = c("l", "r", "r", "r", "r", "r", "r"),
+  caption = "Out-of-fold valuation ratios by tract-income group; counts are sales"
+)
+knitr::kable(
+  price_fairness %>% mutate(median_price = money(median_price), median_ratio = round(median_ratio, 3)),
+  col.names = c("Price band", "Sales", "Median price", "Median ratio"),
+    align = c("l", "r", "r", "r"),
+  caption = "Out-of-fold valuation ratios by observed-price band"
+)
+```
+```{r}
+#| label: income-ratios
+#| fig-alt: "Median out-of-fold predicted-to-sale-price ratios by tract income group, with a reference line at one."
+#| fig-cap: "Median out-of-fold predicted/observed price ratios. Above 1 means overprediction, not a directly calculated tax bill."
+ggplot(filter(fairness, income_group != "Unknown"), aes(income_group, median_ratio)) +
+  geom_col(fill = "#287D8E", width = .65) +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_text(aes(label = round(median_ratio, 2)), vjust = -.4) +
+  scale_y_continuous(expand = expansion(mult = c(0, .12))) +
+  labs(x = "Tract median-household-income group", y = "Median valuation ratio")
+```
+
+**4A.** Among tracts with at least 10 cleaned training sales, tract `r geographic_errors$tract[1]` had the highest MAE at `r money(geographic_errors$mae[1])`. Its mean residual was `r money(geographic_errors$mean_residual[1])`, so our predictions were `r ifelse(geographic_errors$mean_residual[1] > 0, "too low on average", "too high on average")` there.
+
+Our largest individual error was record `r worst$id[1]`: it sold for `r money(worst$sale_price[1])`, but we predicted `r money(worst$pred[1])` when it was held out. Condition, renovations and measurement errors could contribute to the largest misses, but we cannot verify those explanations from the supplied columns. The LISA maps identify places for further investigation. We would need to check the data in those places before choosing a new neighborhood feature. Nearby houses still appear across folds, so these results do not establish performance in completely unseen areas.
+
+**4B.** We split county tracts into three income groups using cutoffs of `r money(cuts[1])` and `r money(cuts[2])`. The lower-income group's median ratio was `r round(fairness$median_ratio[fairness$income_group == "Lower"], 3)`, compared with `r round(fairness$median_ratio[fairness$income_group == "Higher"], 3)` for the higher-income group. We report group sizes, the share overpredicted and the ratio of summed predictions to summed prices too. That last measure gives more weight to expensive sales and can differ from the median individual ratio.
+
+For sales up to $100,000, the median ratio was `r round(price_fairness$median_ratio[1], 3)`. That means the median proportional error in this group was `r pct(price_fairness$median_ratio[1] - 1)` above the sale price. This is a serious weakness even though overall RMSE improved. Lower dollar RMSE does not guarantee small proportional errors for inexpensive houses. Grouping by actual prices can also produce regression-to-the-mean patterns, so this comparison alone does not prove discrimination.
+
+We kept cheap sales instead of excluding them just because they were hard to predict. Removing bundled transactions made the training prices easier to interpret, but these diagnostics do not establish performance for the flagged test transactions. The *Tax Divide* investigation gives us a reason to take proportional overvaluation seriously. These are prediction errors, not actual tax bills or a causal effect of income. [The Tax Divide investigation](https://apps.chicagotribune.com/news/watchdog/cook-county-property-tax-divide/).
+
+Tract income is not an owner's income, and ACS estimates have sampling uncertainty. Across all input rows, `r unmatched_tracts` had no tract match. We retained those rows without borrowing income from another tract. A negative prediction also produces a negative ratio: that is a model failure, not a meaningful property valuation.
+
+---
+
+### What changed for the difficult houses?
+
+We compare the earlier tract model with the selected model on the same held-out training houses. This helps us distinguish a real improvement in prediction from simply hiding negative outputs.
+
+```{r}
+#| label: negative-prediction-diagnostics
+negative_oof <- diagnostics %>%
+  filter(pred < 0) %>%
+  st_drop_geometry() %>%
+  select(id, tract, sale_price, pred, building_000sf, building_age)
+
+knitr::kable(
+  tibble(
+    model = c("Earlier tract model", "Selected model"),
+    negative_oof = c(sum(pred7 < 0), sum(final_predictions < 0))
+  ),
+  col.names = c("Model", "Negative predictions"),
+    align = c("l", "r"),
+  caption = "Negative held-out predictions; no zero bound is applied"
+)
+knitr::kable(
+  negative_oof %>% count(tract, sort = TRUE),
+  col.names = c("Tract", "Negative predictions"),
+    align = c("r", "r"),
+  caption = "Tracts with remaining negative held-out predictions"
+)
+write_csv(negative_oof, "reports/assignment5/negative_oof_predictions.csv")
+```
+
+There are still `r nrow(negative_oof)` negative held-out predictions. Allowing local size slopes helps, but ordinary linear regression does not guarantee positive prices. We do not claim that the issue is fixed just because it is less common.
+
+---
+
+## Part 5: Predict the test houses (provided)
+
+Refit your final recipe on all training sales, then predict every test house. Set `f_final` to your final formula.
+
+The final model was fitted on all cleaned training rows in Part 3. Here we predict every test house using training medians for missing predictors. We keep the raw outputs and list nonpositive predictions for review.
+
+```{r}
+#| label: predict-test
+preds <- tibble(
+  id = test$id,
+  pred = predict(m_final, newdata = final_test)
+)
+
+knitr::kable(head(preds) %>% mutate(pred = money(pred)),
+  col.names = c("ID", "Predicted price"),
+    align = c("r", "r"), caption = "First six predictions (display rounded to dollars)")
+knitr::kable(
+  tibble(
+    test_rows = nrow(test),
+    exported_rows = nrow(preds),
+    unique_ids = length(unique(preds$id)),
+    missing_predictions = sum(is.na(preds$pred)),
+    negative_predictions = sum(preds$pred < 0),
+    zero_predictions = sum(preds$pred == 0)
+  ) %>%
+    pivot_longer(everything(), names_to = "Check", values_to = "Count"),
+  caption = "Prediction checks"
+)
+
+write_csv(preds, "reports/assignment5/team_Jollof_predictions.csv")
+write_csv(model_log, "reports/assignment5/model_log.csv")
+write_csv(cleaning_log, "reports/assignment5/cleaning_log.csv")
+write_csv(st_drop_geometry(diagnostics), "reports/assignment5/oof_predictions.csv")
+write_csv(
+  tibble(id = train$id, property_group = train$property_group, fold = folds),
+  "reports/assignment5/training_folds.csv"
+)
+write_csv(cluster_counts, "reports/assignment5/lisa_counts.csv")
+write_csv(fairness, "reports/assignment5/income_ratios.csv")
+write_csv(price_fairness, "reports/assignment5/price_band_ratios.csv")
+
+review_predictions <- test %>%
+  st_drop_geometry() %>%
+  select(id, building_000sf, building_age, tract, is_multisale) %>%
+  left_join(preds, by = "id") %>%
+  filter(pred <= 0)
+write_csv(review_predictions, "reports/assignment5/predictions_needing_review.csv")
+knitr::kable(
+  review_predictions %>% mutate(pred = money(pred)),
+  col.names = c("ID", "Area (1,000 sq ft)", "Age", "Tract", "Multi-parcel", "Prediction"),
+    align = c("r", "r", "r", "r", "r", "r"),
+  caption = "Reviewed nonpositive predictions; retained in the full export"
+)
+
+review_tract_summary <- train %>%
+  st_drop_geometry() %>%
+  filter(tract %in% review_predictions$tract) %>%
+  group_by(tract) %>%
+  summarise(
+    training_sales = n(),
+    median_price = median(sale_price),
+    min_building_000sf = min(building_000sf),
+    max_building_000sf = max(building_000sf),
+    min_age = min(building_age),
+    max_age = max(building_age),
+    .groups = "drop"
+  )
+knitr::kable(
+  review_tract_summary %>% mutate(median_price = money(median_price)),
+  col.names = c("Tract", "Training sales", "Median price", "Min. area (1,000 sq ft)",
+                "Max. area (1,000 sq ft)", "Min. age", "Max. age"),
+    align = c("r", "r", "r", "r", "r", "r", "r"),
+  digits = 3,
+  caption = "Training coverage in tracts with nonpositive test predictions"
+)
+write_csv(review_tract_summary, "reports/assignment5/nonpositive_tract_context.csv")
+```
+
+Our selected model's grouped 10-fold CV RMSE is `r money(final_cv_rmse)`, based on all `r nrow(train)` cleaned training rows. This is the same score used in model selection, not an independent test score. 
+The instructor's hidden-test RMSE is not yet available.
+
+The file is saved as `reports/assignment5/team_Jollof_predictions.csv`, with all `r nrow(preds)` test IDs in their original order. There are `r sum(preds$pred < 0)` negative predictions and `r sum(preds$pred == 0)` zeros. We have not changed them to a floor or dropped those houses. The table above checks whether their tracts have training examples and shows the observed size and age ranges. Having examples in the same tract does not guarantee a sensible prediction for every combination of characteristics. We cannot label these source records as errors from a negative model output alone. We have reviewed these nonpositive outputs and retained them in the export. They remain model failures, not credible house values or evidence that their source records should be deleted.
+
+---
+
+## Part 6: Reflection (about 300 words, as a team)
+
+1. **Read one coefficient twice:** once as β̂, once for what it does to ŷ.
+2. **Would you hand this model to the Assessor?** What would you warn them about?
+
+We started with house characteristics, then added location because similar houses can sell for different prices across Chicago. We compared squared terms, log size, distance, rings, interactions and tract fixed effects. Adding tract-specific size slopes and an age-by-ring interaction gave the lowest CV RMSE among the tested formulas. We chose among them using the same grouped CV folds. These fitted relationships describe associations; they do not tell us what changing a house or neighborhood would cause.
+
+Our central-air coefficient is `r money(unname(coef(m_final)["central_air"]))`. As beta-hat, it is the estimated price difference between the supplied central-air categories, holding the other predictors fixed. For y-hat, switching that indicator from 0 to 1 changes the predicted price by that amount. We cannot interpret it as the return from installing air conditioning because condition and renovations may also differ between houses.
+
+We would not give this model to the Assessor for operational use yet. It improves on the baseline, but the residual maps and LISA results show where further checks are needed. Dollar RMSE can hide large proportional errors for inexpensive houses. Income-group comparisons help us describe that concern, but tract income is not an owner's income and cannot establish individual fairness.
+
+We removed bundled transactions rather than guessing how to divide their prices. We kept both price tails because we could not justify excluding them. Grouping rounded coordinates helps with repeated sales, but verified parcel IDs would be better. Our CV score also influenced model selection, so it is not an independent final test. Before using this model for assessments, we would evaluate a later year and held-out geographic areas, verify condition and transaction details, and investigate impossible predictions. We would follow Week 8's approach of checking residual clusters and measuring a plausible missing feature before adding it. We should not assume a more complicated model will fix every error.
+
+### Who did what
+
+| Name | Main contribution |
+|---|---|
+| Frederick Abalo | Coordination & Initial data inspection and cleaning discussion. |
+| Leo Leung | Modelling |
+| Emmanuel Sampson | Model evaluation & analysis discussion |
+| Yogi Patnaik | Write Up & Summaries |
+
+
+
+### AI Team Statement
+
+What was your team's AI policy and how was AI used in this assignment?
+
+Our team allowed AI assistance for explaining concepts, drafting and debugging code, and comparing model specification. We limited methods to those covered in class. We remained responsible for checking the code, interpreting results, and understanding the final model.
+
+We used AI assistance to write and debug R code, compare model specifications, draft parts of the explanations, and check the rendered output and prediction files. We also used AI to help examine group ideas that came up during brainstorming sessions.
+
+---
+
+## Appendix: earlier model trials
+
+These are records of earlier experiments, not candidates in the current comparison. We replaced the custom grid, removed the zero bound and extra audit split, and reran the class-based workflow above. The earlier trials used different rows, folds, preprocessing and/or weights, so their scores cannot be compared directly with the current log. We keep them here because the assignment asks us to record every model tried.
+
+<details>
+<summary>Earlier 24-model comparison (before simplifying the workflow)</summary>
+
+| Earlier model | Change tested | CV RMSE ($) | Moran's I |
+|---|---|---:|---:|
+| M0_structure | House attributes only; benchmark | 284,790 | 0.338 |
+| M1_curved_time | Size/age curvature, log lot area, timing and missingness | 266,223 | 0.371 |
+| M2_log_size | Alternative: log size instead of quadratic size | 307,256 | 0.371 |
+| M3_downtown | Straight-line distance to the Loop | 258,365 | 0.383 |
+| M4_distance_curve | Allow downtown distance to bend | 256,566 | 0.387 |
+| M5_rings | Preset 3/8-mile distance categories | 260,298 | 0.384 |
+| M6_spatial_surface | Quadratic east/north spatial trend | 234,828 | 0.335 |
+| M7_cubic_surface | Test a more flexible cubic spatial trend | 225,139 | 0.307 |
+| M8_tract_effects | 2023 Census tract intercepts; sparse tracts pooled | 224,567 | 0.228 |
+| M9_tract_size_ring | Let size slopes vary by distance ring | 212,086 | 0.208 |
+| M10_tract_surface | Combine tract intercepts, size interactions and spatial surface | 198,437 | 0.144 |
+| M11_grid_effects | Alternative 2-mile grid intercepts | 195,543 | 0.157 |
+| M0_structure_nonnegative | Same formula as M0_structure ; constrain predicted values to >= $0 | 284,361 | 0.339 |
+| M1_curved_time_nonnegative | Same formula as M1_curved_time ; constrain predicted values to >= $0 | 266,218 | 0.371 |
+| M2_log_size_nonnegative | Same formula as M2_log_size ; constrain predicted values to >= $0 | 306,796 | 0.373 |
+| M3_downtown_nonnegative | Same formula as M3_downtown ; constrain predicted values to >= $0 | 258,340 | 0.383 |
+| M4_distance_curve_nonnegative | Same formula as M4_distance_curve ; constrain predicted values to >= $0 | 256,563 | 0.387 |
+| M5_rings_nonnegative | Same formula as M5_rings ; constrain predicted values to >= $0 | 260,298 | 0.384 |
+| M6_spatial_surface_nonnegative | Same formula as M6_spatial_surface ; constrain predicted values to >= $0 | 234,768 | 0.335 |
+| M7_cubic_surface_nonnegative | Same formula as M7_cubic_surface ; constrain predicted values to >= $0 | 225,032 | 0.307 |
+| M8_tract_effects_nonnegative | Same formula as M8_tract_effects ; constrain predicted values to >= $0 | 224,182 | 0.228 |
+| M9_tract_size_ring_nonnegative | Same formula as M9_tract_size_ring ; constrain predicted values to >= $0 | 211,654 | 0.208 |
+| M10_tract_surface_nonnegative | Same formula as M10_tract_surface ; constrain predicted values to >= $0 | 197,668 | 0.143 |
+| M11_grid_effects_nonnegative | Same formula as M11_grid_effects ; constrain predicted values to >= $0 | 195,489 | 0.157 |
+
+</details>
+
+<details>
+<summary>Intermediate eight-model comparison (before this revision)</summary>
+
+These models used 17,567 development rows, median filling inside fitting folds and a zero lower bound. The separate audit had 4,401 rows. This setup is no longer used in the analysis above.
+
+| Model | Change tested | CV RMSE ($) | Moran's I |
+|---|---|---:|---:|
+| House_only | House characteristics | 284,174 | 0.372 |
+| Curved_and_time | Squared size/age, log lot area, timing | 264,843 | 0.408 |
+| Log_size | Log size instead of quadratic size | 306,725 | 0.406 |
+| Downtown_distance | Distance to Loop | 256,909 | 0.420 |
+| Squared_distance | Squared distance to Loop | 255,075 | 0.422 |
+| Distance_rings | Distance rings | 258,913 | 0.420 |
+| Size_by_ring | Size-by-ring interaction | 248,806 | 0.415 |
+| Grid_effects | Custom 2-mile grid intercepts | 193,716 | 0.202 |
+
+</details>

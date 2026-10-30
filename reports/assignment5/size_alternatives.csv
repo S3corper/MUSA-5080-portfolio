@@ -1,0 +1,6 @@
+model,cv_rmse,negative_oof
+Age_by_ring,198334.52817962962,16
+Tract_effects,203501.60680728836,77
+Tract_linear_size,206570.56142688732,154
+Tract_log_size,224566.07864164686,310
+Tract_size_slopes,198467.57089585267,17

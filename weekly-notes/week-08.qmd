@@ -1,0 +1,132 @@
+---
+title: "Week 8: Local Errors, Spatial Features, and RealPage"
+description: "Simple notes on finding clustered errors and using predictions responsibly."
+author: "Leo Leung"
+date: 2026-10-23
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    code-fold: false
+execute:
+  eval: false
+---
+
+These standalone notes summarize Dr. Elizabeth Delmelle's October 23, 2026 lecture. Numerical results below come from the supplied lecture text.
+
+## 1. What is this week about?
+
+A model can perform well overall but repeatedly make mistakes in the same neighborhood.
+
+- **Find the mistakes:** use global Moran's I and LISA.
+- **Investigate them:** measure a missing neighborhood feature and test it.
+- **Consider the consequences:** ask who is affected by the predictions.
+
+## 2. Start with prediction errors
+
+$$
+\text{Residual} = \text{actual price} - \text{predicted price}
+$$
+
+For a house that sells for **\$300,000**:
+
+| Prediction | Residual | Meaning |
+|---|---:|---|
+| \$250,000 | +\$50,000 | Underprediction: the prediction is too low |
+| \$350,000 | −\$50,000 | Overprediction: the prediction is too high |
+
+Use **out-of-fold residuals**: predict each house using a model trained without that house's validation group. This checks how well the model predicts data it did not train on.
+
+## 3. Global Moran's I and LISA
+
+**Spatial autocorrelation** means nearby observations have related values. Here, we are studying nearby prediction errors.
+
+| Method | What it gives | Question it answers |
+|---|---|---|
+| Global Moran's I | One number for the dataset | Do similar errors cluster overall? |
+| Local Moran's I (used in LISA) | One number per house | Where are the clusters and unusual houses? |
+
+LISA means **Local Indicators of Spatial Association**. The lecture uses each house's **five nearest sales** as its neighbors.
+
+### The basic calculation
+
+Local Moran's I multiplies a house's centered residual by its neighbors' average centered residual, then divides by a common scale. A **centered residual** is the residual minus the mean residual.
+
+- **Same signs:** a positive local value, suggesting similar errors nearby.
+- **Opposite signs:** a negative local value, suggesting a house differs from its neighbors.
+
+The lecture's five-house example gives an average local value of **0.72**, equal to global Moran's I under the same row-standardized weights. These weights average the neighbors. Different weights can give a different result, so keep weights consistent when comparing models.
+
+### Read the four groups
+
+The **first word describes the house**; the **second describes its neighbors**.
+
+| Group | Meaning | What to investigate |
+|---|---|---|
+| High–High | High residual among high residuals | A missing neighborhood amenity |
+| Low–Low | Low residual among low residuals | A missing neighborhood disadvantage |
+| High–Low | High residual among low residuals | An unusual house or incorrect data |
+| Low–High | Low residual among high residuals | An unusual house or incorrect data |
+
+**High and low are relative to the mean residual.** If that mean is near zero, High–High roughly means a pocket of underprediction, and Low–Low roughly means a pocket of overprediction.
+
+High–High and Low–Low are **clusters**. High–Low and Low–High are **spatial outliers**. Neither proves the cause of an error.
+
+The lecture uses **499 random permutations** and a **0.01 significance threshold** to flag patterns. With thousands of houses, some flags can occur by chance. “Not significant” does not mean a prediction is accurate.
+
+## 4. Turn “near” into a measurable feature
+
+**Operationalizing** means turning an idea into a number. For example, “near violent incidents” can be measured in three ways:
+
+| Method | Example | Limitation |
+|---|---|---|
+| Buffer count | Number of incidents within 660 feet | Depends on the chosen radius |
+| Nearest distance | Distance to the closest incident | One incident can dominate |
+| kNN mean distance | Average distance to the five closest incidents | Depends on the chosen number of neighbors |
+
+More incidents produce a **higher count**. Closer incidents produce a **smaller distance**. Use coordinates with suitable distance units; the lecture uses feet.
+
+Logging a distance emphasizes proportional changes: 100 to 500 feet is a much bigger proportional change than 5,000 to 5,400 feet. Check that distances are positive before taking their logarithms.
+
+Choose a few reasonable radii or neighbor counts, then compare **cross-validation RMSE** using the same rows and folds. RMSE measures prediction error; **lower is better**.
+
+## 5. Did adding vacancy help?
+
+The lecture tests whether neighborhood vacancy explains Low–Low pockets.
+
+| Model | CV RMSE | Global Moran's I | Low–Low houses |
+|---|---:|---:|---:|
+| House features + incident kNN distance | \$432,287 | 0.260 | 536 |
+| Same model + tract vacancy | \$431,883 | 0.258 | 705 |
+
+Prediction error and overall clustering decrease slightly, but **more houses are classified as Low–Low**. Adding vacancy did not reduce the number of flagged Low–Low houses. A better overall score does not guarantee better local results.
+
+Use this workflow:
+
+1. Fit a model and calculate out-of-fold residuals.
+2. Check global Moran's I and map the LISA groups.
+3. Ask what might explain a cluster.
+4. Measure that idea and add it as a feature.
+5. Refit and compare prediction error and local patterns.
+
+## 6. Why do these errors matter?
+
+If predictions were used for property assessments, overprediction could mean an excessive tax burden.
+
+In the lecture, **4.48%** of sales in the lowest tract-income group were Low–Low, compared with **0.459%** in the highest group. This suggests uneven error patterns worth investigating. These are model results, not actual tax bills; tract income also does not tell us an individual household's income.
+
+## 7. RealPage: should we use the model?
+
+The lecture describes RealPage software that recommends rents using public information, landlords' own records, and competitors' private rental data.
+
+The debate concerns **sharing competitors' private information** and **how freely managers can reject recommendations**. Critics argue that this can help landlords coordinate prices. Defenders emphasize efficiency and managers' control over final prices.
+
+The classroom bidding exercise asks whether a consulting firm should accept, modify, or reject requests such as pooling private rent rolls, accepting recommendations by default, and maximizing revenue. It asks students to distinguish what they can build from what they are willing to sell.
+
+Three questions guide the discussion:
+
+1. **Where does the data come from?** Public information and competitors' private records raise different concerns.
+2. **Who makes the decision?** Can a manager meaningfully reject the recommendation?
+3. **Who bears the consequences?** Renters may be harmed even when the model accurately predicts what they will pay.
+
+**Accuracy alone does not make a model's use fair or beneficial.**
